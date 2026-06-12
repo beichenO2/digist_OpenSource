@@ -1,0 +1,152 @@
+{
+  "project": "digist",
+  "version": "0.3.0",
+  "capabilities": [
+    {
+      "id": "digist.crawl",
+      "service_name": "digist-api",
+      "description": "触发平台爬取（hackernews, bloomberg, glass 等）",
+      "transport": "http",
+      "endpoint": "/api/crawl/trigger",
+      "method": "POST",
+      "input_schema": {
+        "type": "object",
+        "required": ["platform"],
+        "properties": {
+          "platform": { "type": "string" },
+          "query": { "type": "string" }
+        }
+      },
+      "idempotent": false,
+      "side_effects": true,
+      "timeout_ms": 60000
+    },
+    {
+      "id": "digist.recommend",
+      "service_name": "digist-api",
+      "description": "个性化内容推荐",
+      "transport": "http",
+      "endpoint": "/api/recommend",
+      "method": "GET",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": { "type": "string" },
+          "n": { "type": "integer" },
+          "topics": { "type": "string" }
+        }
+      },
+      "idempotent": true,
+      "side_effects": false,
+      "timeout_ms": 15000
+    },
+    {
+      "id": "digist.items.recent",
+      "service_name": "digist-api",
+      "description": "获取最近的摘要条目",
+      "transport": "http",
+      "endpoint": "/api/items/recent",
+      "method": "GET",
+      "input_schema": {
+        "type": "object",
+        "properties": { "limit": { "type": "integer", "default": 20 } }
+      },
+      "idempotent": true,
+      "side_effects": false,
+      "timeout_ms": 5000
+    },
+    {
+      "id": "digist.push-to-knowlever",
+      "service_name": "digist-api",
+      "description": "将摘要内容推送到 KnowLever 知识库",
+      "transport": "http",
+      "endpoint": "/api/push-to-knowlever",
+      "method": "POST",
+      "input_schema": {
+        "type": "object",
+        "required": ["url", "topic"],
+        "properties": {
+          "url": { "type": "string" },
+          "topic": { "type": "string" },
+          "user": { "type": "string" }
+        }
+      },
+      "idempotent": false,
+      "side_effects": true,
+      "timeout_ms": 30000
+    },
+    {
+      "id": "digist.interests.list",
+      "service_name": "digist-api",
+      "description": "列出所有兴趣点",
+      "transport": "http",
+      "endpoint": "/api/interests",
+      "method": "GET",
+      "idempotent": true,
+      "side_effects": false,
+      "timeout_ms": 5000
+    },
+    {
+      "id": "digist.sync-to-knowlever",
+      "service_name": "digist-api",
+      "description": "按兴趣领域批量同步 digist 内容到 KnowLever 知识库",
+      "transport": "http",
+      "endpoint": "/api/sync-to-knowlever",
+      "method": "POST",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "interest": { "type": "string", "description": "指定兴趣领域（可选）" },
+          "days": { "type": "integer", "description": "同步最近 N 天（可选）" }
+        }
+      },
+      "idempotent": false,
+      "side_effects": true,
+      "timeout_ms": 60000
+    },
+    {
+      "id": "digist.health",
+      "service_name": "digist-api",
+      "description": "服务健康检查",
+      "transport": "http",
+      "endpoint": "/health",
+      "method": "GET",
+      "idempotent": true,
+      "side_effects": false,
+      "timeout_ms": 5000
+    },
+    {
+      "id": "digist.lobster.status",
+      "service_name": "digist-api",
+      "description": "PolarClaw Lobster 项目状态查询",
+      "transport": "http",
+      "endpoint": "/api/lobster/status",
+      "method": "GET",
+      "idempotent": true,
+      "side_effects": false,
+      "timeout_ms": 5000
+    },
+    {
+      "id": "digist.lobster.health",
+      "service_name": "digist-api",
+      "description": "PolarClaw Lobster 健康检查（DB/API/调度/SOTAgent）",
+      "transport": "http",
+      "endpoint": "/api/lobster/health",
+      "method": "GET",
+      "idempotent": true,
+      "side_effects": false,
+      "timeout_ms": 10000
+    },
+    {
+      "id": "digist.lobster.test",
+      "service_name": "digist-api",
+      "description": "PolarClaw Lobster 靶子测试（事件发射/DB/契约）",
+      "transport": "http",
+      "endpoint": "/api/lobster/test",
+      "method": "POST",
+      "idempotent": false,
+      "side_effects": true,
+      "timeout_ms": 15000
+    }
+  ]
+}

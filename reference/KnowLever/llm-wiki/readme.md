@@ -1,0 +1,18 @@
+---
+title: reference/
+type: concept
+tags: ecosystem-digist
+date: 2026-05-02
+status: draft
+confidence: 0.5
+source_ids:
+  - src-20260502-readme
+---
+
+# reference/
+
+Clone 的参考项目、SOTA 对标材料和外部技术文档存放于此。
+
+- 仅存放只读参考资料，不包含本项目源代码
+- 可包含 clone 的开源项目、论文、技术博客摘录等
+- 大文件建议使用 Git LFS 或仅保留链接

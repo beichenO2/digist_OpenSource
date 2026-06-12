@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://polarisor.local/digist/contracts/feedback.schema.json",
+  "title": "Feedback",
+  "description": "用户对推荐条目的结构化反馈",
+  "type": "object",
+  "required": ["id", "item_id", "action"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "item_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "对应 content_items 的 id"
+    },
+    "action": {
+      "type": "string",
+      "enum": ["not_interested", "archive", "ingest"],
+      "description": "not_interested=不感兴趣, archive=归档, ingest=入库"
+    },
+    "reason": {
+      "type": ["string", "null"],
+      "enum": ["topic_irrelevant", "low_quality", "duplicate", "too_long", "platform_unwanted", "outdated", null],
+      "description": "结构化原因枚举"
+    },
+    "note": {
+      "type": ["string", "null"],
+      "description": "自由文本备注"
+    },
+    "user_id": { "type": "string", "default": "admin" },
+    "created_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

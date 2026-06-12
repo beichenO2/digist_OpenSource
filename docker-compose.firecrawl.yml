@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  firecrawl:
+    image: ghcr.io/mendableai/firecrawl:latest
+    ports:
+      - "3005:3005"
+    environment:
+      - PORT=3005
+      - HOST=0.0.0.0
+      - REDIS_URL=redis://redis:6379
+      - USE_DB_AUTHENTICATION=false
+      - NUM_WORKERS_PER_QUEUE=2
+      - PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - firecrawl-redis:/data
+    restart: unless-stopped
+
+volumes:
+  firecrawl-redis:

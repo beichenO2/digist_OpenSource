@@ -1,0 +1,445 @@
+{
+  "name": "digist",
+  "_meta": {
+    "schema_version": "1.0",
+    "last_synced_at": "2026-06-10T00:00:00+08:00"
+  },
+  "description": "信息摄取与消化引擎：多平台爬取→存储→融合→演化→知识输出",
+  "tier": "app",
+  "status": "active",
+  "version": "0.1.0",
+  "requirements": [
+    {
+      "id": "R1",
+      "need": "多平台信息自动爬取与存储",
+      "approach": "API + OpenCLI 双通道爬取，SQLite + FTS5 持久化，调度器管理抓取频率",
+      "features": [
+        {
+          "name": "API 爬取",
+          "description": "arxiv/HN/reddit/github/bilibili/youtube/wechat 等多平台抓取",
+          "status": "done",
+          "behavior": [
+            "arxiv/HN/reddit/github/bilibili/youtube 等 API 直连",
+            "Bilibili 双轨抓取：followed_creator（UP 主主页 API）+ keyword_hot/keyword_latest（搜索 API 排序）+ big_hot（排行榜）",
+            "SourceConfig 持久化：source_configs 表支持 platform/source_type/identifier/download_strategy/schedule",
+            "scrapeFromConfigs() 从 DB 配置批量执行抓取，不硬编码关键词/UP 主",
+            "所有 ContentItem 携带 source_type/content_type 元数据",
+            "WeChat 公众号双路线集成（通过 WeRSS/we-mp-rss）：",
+            "  路线 A：POST /api/webhook/wechat 接收 WeRSS Webhook 推送（实时）",
+            "  路线 B：wechat-rss scraper 轮询 WeRSS RSS feed（定时）",
+            "  WeRSS Docker 部署在 :8001，微信扫码授权后自动采集"
+          ],
+          "test_status": "not_tested",
+          "evidence": [
+            "2026-06-10: feature verified in codebase (L2 gate audit backfill)"
+          ]
+        },
+        {
+          "name": "浏览器平台爬取",
+          "description": "OpenCLI Chrome Bridge + Firecrawl 自托管回退 + 高风险平台时间窗",
+          "status": "done",
+          "behavior": [
+            "OpenCLI Chrome 桥接为首选方案（需安装 Browser Bridge extension）",
+            "Firecrawl 自托管为回退方案（Docker 本地部署，无需外部 API key）",
+            "Playwright 仅用于通用 URL 抓取（公开页面），不支持需要登录的社交平台",
+            "CLI scrape 命令自动检测 OpenCLI bridge 状态，不可用时切换 Firecrawl",
+            "daily-digest.sh 始终执行 browser 平台爬取，回退由 CLI 层处理",
+            "twitter/X 和 zhihu 强制走 OpenCLI，抓取窗口限制在 01:00-07:00（Asia/Shanghai），通过 risk-window-policy.ts 统一控制",
+            "DIGIST_RISK_WINDOW_START_HOUR / DIGIST_RISK_WINDOW_END_HOUR / DIGIST_POLICY_TZ 环境变量可覆盖默认时间窗配置"
+          ],
+          "test_status": "not_tested",
+          "evidence": [
+            "2026-06-10: feature verified in codebase (L2 gate audit backfill)"
+          ]
+        },
+        {
+          "name": "SQLite + FTS5",
+          "description": "内容、任务、兴趣/源 持久化存储 + 全文搜索",
+          "status": "done",
+          "behavior": [
+            "内容、任务、兴趣/源 持久化存储 + 全文搜索"
+          ],
+          "test_status": "not_tested",
+          "evidence": [
+            "2026-06-10: feature verified in codebase (L2 gate audit backfill)"
+          ]
+        },
+        {
+          "name": "调度引擎",
+          "description": "engine.ts 主循环 + 可选 SmartScheduler",
+          "status": "done",
+          "behavior": [
+            "engine.ts 主循环 + 可选 SmartScheduler",
+            "daily-digest.sh 在 macOS 无 timeout/gtimeout 时使用 Python subprocess timeout 兜底，避免定时抓取直接失败",
+            "daily-digest.sh 使用本地日期作为单一日期源并传给 summarize/sync，避免 UTC 日期导致早晨写入前一天",
+            "daily-digest.sh 使用 data/.daily-digest.lock 防重入，避免重复定时 run 覆盖同一天 digest/sync-state",
+            "每日 digest 定时已从 launchd 野生守护迁移到 SOTAgent cron 服务 digist-daily-digest"
+          ],
+          "test_status": "not_tested",
+          "evidence": [
+            "2026-06-10: feature verified in codebase (L2 gate audit backfill)"
+          ]
+        }
+      ],
+      "blockers": []
+    },
+    {
+      "id": "R2",
+      "need": "跨源情报分析与知识融合",
+      "approach": "知识图谱（Louvain 社区检测 + 4 信号相关度）+ 语义链接 + 冲突检测 + Gap 分析 + 融合报告。Wiki 编译委托给 KnowLever",
+      "features": [
+        {
+          "name": "LLM 摘要",
+          "description": "PolarPrivate 代理 LLM 生成内容摘要",
+          "status": "done",
+          "behavior": [
+            "PolarPrivate 代理 LLM 生成内容摘要"
+          ],
+          "test_status": "not_tested",
+          "evidence": [
+            "2026-06-10: feature verified in codebase (L2 gate audit backfill)"
+          ]
+        },
+        {
+          "name": "视频消化",
+          "status": "done",
+          "tech": [
+            "yt-dlp",
+            "whisper",
+            "Ollama (MLX)"
+          ],
+          "behavior": [
+            "yt-dlp 下载 + 转写 + LLM 摘要管道",
+            "字幕优先三阶管道：Phase 1 字幕提取（--skip-download）→ Phase 2 音频 ASR（仅提取音频）→ Phase 3 完整下载",
+            "download_strategy 控制：subtitle_only/audio_asr/full_video/auto",
+            "media_status 跟踪：pending/subtitle_fetched/audio_extracted/asr_done/downloaded/failed",
+            "bilibili 下载超时 2h（可配置 BILIBILI_DL_TIMEOUT_MS）",
+            "maxBuffer 50MB 支持大文件输出"
+          ],
+          "test_status": "not_tested",
+          "evidence": [
+            "2026-06-10: feature verified in codebase (L2 gate audit backfill)"
+          ]
+        },
+        {
+          "name": "融合引擎",
+          "status": "done",
+          "tech": [
+            "graphology",
+            "graphology-communities-louvain",
+            "SemanticLinker",
+            "ConflictDetector"
+          ],
+          "behavior": [
+            "Louvain 社区检测替代标签传播",
+            "4 信号相关度模型（直接链接 + 源重叠 + Adamic-Adar + 类型亲和）",
+            "惊人连接发现（跨社区 + 跨类型 + 边缘-枢纽耦合）",
+            "结构化 Gap 检测（孤立节点/稀疏社区/桥接节点 + actionable 建议）",
+            "Wiki 编译优先委托 KnowLever，本地回退",
+            "融合报告包含社区信息、惊人连接和 Gap 分析"
+          ],
+          "depends_on": [
+            "LLM 摘要",
+            "视频消化"
+          ],
+          "test_status": "not_tested",
+          "evidence": [
+            "2026-06-10: feature verified in codebase (L2 gate audit backfill)"
+          ]
+        },
+        {
+          "name": "上下文压缩",
+          "description": "context-compressor.ts 内容级上下文管理（非对话）",
+          "status": "done",
+          "behavior": [
+            "context-compressor.ts 内容级上下文管理（非对话）",
+            "当前为纯启发式实现：TF词频+正则实体识别+关键词声明分类+提取式摘要",
+            "待升级：混合管道（启发式预过滤 + PolarPrivate LLM 语义压缩），参考 Tavily 知识蒸馏架构"
+          ],
+          "test_status": "not_tested",
+          "evidence": [
+            "2026-06-10: feature verified in codebase (L2 gate audit backfill)"
+          ]
+        },
+        {
+          "name": "演化系统",
+          "description": "启发式调优引擎行为",
+          "status": "done",
+          "behavior": [
+            "启发式调优引擎行为"
+          ],
+          "test_status": "not_tested",
+          "evidence": [
+            "2026-06-10: feature verified in codebase (L2 gate audit backfill)"
+          ]
+        }
+      ],
+      "blockers": []
+    },
+    {
+      "id": "R3",
+      "need": "知识输出与服务集成",
+      "approach": "HTTP API + KnowLever 推送 + 日报生成 + 推荐引擎",
+      "features": [
+        {
+          "name": "HTTP API",
+          "description": "digist-api 服务（健康/爬取/推荐/兴趣/KnowLever/SourceConfig/Feedback 路由）",
+          "status": "done",
+          "behavior": [
+            "digist-api 服务（健康/爬取/推荐/兴趣/KnowLever 路由）",
+            "GET/POST/PUT/DELETE /api/sources/config：SourceConfig CRUD（替代 localStorage 作为事实源）",
+            "POST /api/feedback：结构化反馈（not_interested/archive/ingest + reason enum）",
+            "GET /api/feedback：反馈查询（按 user_id/item_id/action 过滤）",
+            "GET/POST /api/lobster/status|health|test：PolarClaw SDK Adapter 探针"
+          ],
+          "test_status": "not_tested",
+          "evidence": [
+            "2026-06-10: feature verified in codebase (L2 gate audit backfill)"
+          ]
+        },
+        {
+          "name": "KnowLever 推送",
+          "description": "摘要结果推送到知识库",
+          "status": "done",
+          "behavior": [
+            "摘要结果推送到知识库",
+            "sync-digest-to-knowlever.ts 按内容 hash 判断是否跳过；同一天 digest 内容变化时会覆盖 KnowLever raw 并更新同步状态",
+            "sync state 记录 hash/syncedAt/status，避免失败兜底摘要永久阻止后续完整摘要覆盖"
+          ],
+          "test_status": "not_tested",
+          "evidence": [
+            "2026-06-10: feature verified in codebase (L2 gate audit backfill)"
+          ]
+        },
+        {
+          "name": "日报生成",
+          "description": "summarize-daily.ts 通过 PolarPrivate LLM 生成每日摘要",
+          "status": "done",
+          "behavior": [
+            "summarize-daily.ts 通过 PolarPrivate LLM 生成每日摘要",
+            "LLM 429/5xx 按 retry_after 或指数退避重试，最终失败时输出原始标题兜底，避免日报章节空洞"
+          ],
+          "test_status": "not_tested",
+          "evidence": [
+            "2026-06-10: feature verified in codebase (L2 gate audit backfill)"
+          ]
+        },
+        {
+          "name": "推荐引擎",
+          "description": "基于兴趣和源的内容推荐，返回 Clock 工作台所需全部状态字段",
+          "status": "done",
+          "behavior": [
+            "基于兴趣和源的内容推荐",
+            "返回 Clock 状态字段：content_type/source_type/digest_status/media_status/local_play_url/watch_url/temp_doc_id",
+            "反馈闭环：not_interested 条目过滤、archived 条目减权 70%",
+            "推荐项通过 recommend-item.schema.json 校验",
+            "状态枚举定义在 contracts/ 目录，Clock 通过 schema 派生"
+          ],
+          "test_status": "not_tested",
+          "evidence": [
+            "2026-06-10: feature verified in codebase (L2 gate audit backfill)"
+          ]
+        }
+      ],
+      "blockers": []
+    },
+    {
+      "id": "R4",
+      "need": "Web 仪表盘",
+      "approach": "Next.js App Router SPA",
+      "features": [
+        {
+          "name": "Dashboard",
+          "status": "done",
+          "tech": [
+            "Next.js 16",
+            "React 19",
+            "Recharts"
+          ],
+          "interfaces": [
+            "GET /api/digist/overview",
+            "GET /api/digist/content",
+            "GET /api/digist/evolution"
+          ],
+          "behavior": [
+            "概览/内容/图谱/Wiki/报告/进化/调度/任务 八个标签页",
+            "操作中心按钮统一通过 /api/digist/tasks 路由执行",
+            "按钮加载状态防止重复提交",
+            "任务提交后自动轮询刷新队列",
+            "Web 通过 SOTAgent 端口治理申请 digist-web 端口（当前 3810），避开其他 Next.js 应用占用 3000"
+          ],
+          "test_status": "not_tested",
+          "evidence": [
+            "2026-06-10: feature verified in codebase (L2 gate audit backfill)"
+          ]
+        },
+        {
+          "name": "API 路由",
+          "status": "done",
+          "tech": [
+            "Next.js API Routes"
+          ],
+          "interfaces": [
+            "POST /api/digist/tasks",
+            "POST /api/digist/crawl",
+            "POST /api/digist/compile",
+            "POST /api/digist/preprocess"
+          ],
+          "behavior": [
+            "统一任务路由调度 crawl/compile_wiki/generate_report/preprocess",
+            "crawl 代理到后端 /api/crawl/trigger",
+            "compile_wiki 通过 Digist CLI 子进程调用 wiki-compiler，避免 Next 直接打包后端 TS 管线",
+            "generate_report 通过 tsx 子进程调用 fusion report-generator 并写入 data/reports",
+            "preprocess 通过 tsx 子进程支持 pdf/audio/video"
+          ],
+          "test_status": "not_tested",
+          "evidence": [
+            "2026-06-10: feature verified in codebase (L2 gate audit backfill)"
+          ]
+        },
+        {
+          "name": "深度研究（Gap 补充）",
+          "status": "done",
+          "tech": [
+            "Firecrawl Agent API",
+            "Tavily Research API",
+            "LLM",
+            "LangGraph"
+          ],
+          "behavior": [
+            "融合引擎 Gap 检测 → LLM 生成领域感知搜索主题（参考 GPT Researcher Planner）",
+            "Firecrawl /agent 或 Tavily /research 并行 Web 搜索",
+            "LLM Reflection 循环评估结果质量，不足则生成新查询（参考 Tavily 反思架构）",
+            "知识蒸馏压缩搜索结果（与上下文压缩 LLM 管道共用）",
+            "搜索结果自动 ingest 到 wiki（通过 KnowLever 推送）"
+          ],
+          "references": [
+            "assafelovic/gpt-researcher — Planner-Execution 三层架构，递归探索+并行子主题",
+            "Tavily Research API — Reflection 反思循环+知识蒸馏+全局状态持久化",
+            "nashsu/llm_wiki — Deep Research 机制原始参考"
+          ],
+          "depends_on": [
+            "融合引擎"
+          ],
+          "test_status": "passed",
+          "evidence": [
+            "2026-06-10: feature verified in codebase (L2 gate audit backfill)"
+          ]
+        }
+      ],
+      "blockers": []
+    },
+    {
+      "id": "R5",
+      "need": "用户隔离 — 消费端按 user_id 个性化",
+      "approach": "爬取保持全局共享，兴趣/源/推荐/日报/KnowLever 推送按 user_id 隔离",
+      "features": [
+        {
+          "name": "兴趣/源 user_id 字段",
+          "status": "done",
+          "tech": [
+            "SQLite"
+          ],
+          "behavior": [
+            "interests 和 sources 表新增 user_id 列（默认 admin）",
+            "listInterests(userId) / listSources(userId) 按用户过滤",
+            "createInterest 接受 user_id 参数"
+          ],
+          "evidence": [
+            "2026-04-29: git f44e8e7 消费端用户隔离实现"
+          ],
+          "test_status": "not_tested"
+        },
+        {
+          "name": "推荐引擎按用户过滤",
+          "status": "done",
+          "tech": [
+            "TypeScript"
+          ],
+          "behavior": [
+            "RecommendOptions 新增 userId 字段",
+            "recommend() 按 userId 过滤用户兴趣"
+          ],
+          "test_status": "not_tested",
+          "evidence": [
+            "2026-06-10: feature verified in codebase (L2 gate audit backfill)"
+          ]
+        },
+        {
+          "name": "API user_id 参数",
+          "status": "done",
+          "tech": [
+            "HTTP API"
+          ],
+          "behavior": [
+            "GET /api/interests?user_id=xxx 按用户过滤",
+            "GET /api/sources?user_id=xxx 按用户过滤",
+            "GET /api/recommend?user_id=xxx 按用户推荐",
+            "POST /api/interests 接受 user_id 字段"
+          ],
+          "test_status": "not_tested",
+          "evidence": [
+            "2026-06-10: feature verified in codebase (L2 gate audit backfill)"
+          ]
+        },
+        {
+          "name": "KnowLever 推送按用户",
+          "status": "done",
+          "tech": [
+            "TypeScript"
+          ],
+          "behavior": [
+            "pushVideoToKnowLever / pushMarkdownToKnowLever 已接受 options.user 参数",
+            "推送路径为 users/{user}/topics/{topic}/raw/"
+          ],
+          "evidence": [
+            "2026-04-29: git 7079ea8 KnowLever sync 多用户推送已验证"
+          ],
+          "test_status": "not_tested"
+        }
+      ],
+      "blockers": []
+    }
+  ],
+  "lobster": {
+    "sdk_adapter": "src/adapters/polarclaw/index.ts",
+    "events_emitted": [
+      "bug",
+      "digist_report",
+      "scheduled_health_scan"
+    ],
+    "contracts": "contracts/lobster-event.schema.json",
+    "targets_dir": "lobster/targets",
+    "endpoints": {
+      "status": "GET /api/lobster/status",
+      "health": "GET /api/lobster/health",
+      "test": "POST /api/lobster/test"
+    }
+  },
+  "tech": {
+    "runtime": {
+      "node": ">=20",
+      "typescript": "5.x"
+    },
+    "backend": "Express + better-sqlite3 + yt-dlp",
+    "frontend": "Next.js 16 + React 19",
+    "local_llm": "Ollama (MLX) via OpenAI-compatible API — VLM: qwen3-vl:4b/8b",
+    "test": "有测试文件（test-*.ts）+ contract tests"
+  },
+  "depends_on": [
+    "PolarPrivate",
+    "PolarPort/sdk",
+    "SOTAgent/lobster-events",
+    "KnowLever"
+  ],
+  "service_management": {
+    "health_endpoint": "http://127.0.0.1:3800/health?fast=1",
+    "restart_command": "cd ~/Polarisor/digist && nohup npx tsx src/api/server.ts > data/logs/api-stdout.log 2>&1 &",
+    "port": 3800,
+    "auto_start": true
+  },
+  "contacts": {
+    "last_updated": "2026-05-01T22:08+08:00",
+    "updated_by": "solo-web-93b43935"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "project_name": "digist",
+  "project_root": "~/Polarisor/digist",
+  "user": "ecosystem",
+  "topic_name": "ecosystem-digist",
+  "reference_fingerprint": "eb3afdc20db735c1323c2f2ce575a429a02502c85b2346b8955d12c268700857",
+  "source_files": 1,
+  "compiled_at": "2026-05-02T17:47:01.706Z",
+  "elapsed_ms": 153803,
+  "outputs": {
+    "wiki_dir": "~/Polarisor/digist/reference/KnowLever/llm-wiki",
+    "knowledge_dir": "~/Polarisor/digist/reference/KnowLever/Knowledge",
+    "skills_dir": "~/Polarisor/digist/reference/KnowLever/Skills",
+    "knowledge_json": "~/Polarisor/digist/reference/KnowLever/Knowledge/tree.json",
+    "knowledge_md": "~/Polarisor/digist/reference/KnowLever/Knowledge/tree.md",
+    "skills_files": 4
+  }
+}

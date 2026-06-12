@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://polarisor.local/digist/contracts/source-config.schema.json",
+  "title": "SourceConfig",
+  "description": "Bilibili/YouTube 等平台信息源配置，支持关注博主与关键词两类来源",
+  "type": "object",
+  "required": ["id", "platform", "source_type", "identifier", "enabled"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "platform": {
+      "type": "string",
+      "enum": ["bilibili", "youtube", "arxiv", "hackernews", "reddit", "github", "glass", "other"]
+    },
+    "source_type": {
+      "type": "string",
+      "enum": ["followed_creator", "keyword_hot", "keyword_latest", "big_hot"]
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "description": "UP 主 mid/用户名 或搜索关键词"
+    },
+    "display_name": {
+      "type": "string",
+      "description": "用于 UI 展示的友好名称"
+    },
+    "download_strategy": {
+      "type": "string",
+      "enum": ["subtitle_only", "audio_asr", "full_video", "auto"],
+      "default": "auto",
+      "description": "auto: followed_creator→full_video, keyword→subtitle_only"
+    },
+    "auto_compile": {
+      "type": "boolean",
+      "default": true,
+      "description": "抓取后是否自动编译摘要"
+    },
+    "max_items": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "default": 20
+    },
+    "schedule": {
+      "type": ["string", "null"],
+      "description": "cron 表达式或 null（手动触发）"
+    },
+    "enabled": { "type": "boolean", "default": true },
+    "user_id": { "type": "string", "default": "admin" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

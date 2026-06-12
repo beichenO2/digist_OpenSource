@@ -1,0 +1,20 @@
+[
+  {
+    "id": "fb-001",
+    "item_id": "abc123",
+    "action": "not_interested",
+    "reason": "topic_irrelevant",
+    "note": null,
+    "user_id": "admin",
+    "created_at": "2026-05-01T12:00:00.000Z"
+  },
+  {
+    "id": "fb-002",
+    "item_id": "def456",
+    "action": "ingest",
+    "reason": null,
+    "note": "非常有价值的论文摘要",
+    "user_id": "admin",
+    "created_at": "2026-05-01T12:05:00.000Z"
+  }
+]

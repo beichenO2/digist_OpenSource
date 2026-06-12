@@ -1,0 +1,48 @@
+{
+  "name": "digist",
+  "version": "0.1.0",
+  "description": "AI self-evolution information digestion engine",
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js",
+    "./crawl-api": "./dist/api/crawl-api.js",
+    "./preprocess": "./dist/api/preprocess.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "scrape": "tsx src/cli.ts",
+    "digist-api": "tsx src/api/server.ts",
+    "digist-api:watch": "tsx watch src/api/server.ts",
+    "summarize": "tsx scripts/summarize-daily.ts",
+    "sync-knowlever": "tsx scripts/sync-digest-to-knowlever.ts",
+    "test": "tsx test-edge.ts && tsx test-all.ts && tsx test-scrapers.ts && tsx test-perf.ts",
+    "test:edge": "tsx test-edge.ts",
+    "test:all": "tsx test-all.ts",
+    "test:scrapers": "tsx test-scrapers.ts",
+    "test:perf": "tsx test-perf.ts"
+  },
+  "dependencies": {
+    "@mendable/firecrawl-js": "^1.21.1",
+    "axios": "^1.7.0",
+    "better-sqlite3": "^11.0.0",
+    "cheerio": "^1.0.0",
+    "graphology": "^0.26.0",
+    "graphology-communities-louvain": "^2.0.2",
+    "nanoid": "^5.0.0",
+    "node-cron": "^3.0.3",
+    "turndown": "^7.2.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/node": "^22.0.0",
+    "@types/node-cron": "^3.0.0",
+    "@types/turndown": "^5.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,0 +1,48 @@
+[
+  {
+    "title": "影视飓风：4K HDR 拍摄实战教程",
+    "platform": "bilibili",
+    "url": "https://www.bilibili.com/video/BV1example",
+    "score": 0.87,
+    "signals": {
+      "relevance": 0.9,
+      "density": 0.8,
+      "freshness": 0.95,
+      "crossPlatform": 0.3,
+      "novelty": 0.7
+    },
+    "reason": "兴趣匹配度高、新鲜度高",
+    "timestamp": "2026-05-01T10:00:00.000Z",
+    "content_type": "video",
+    "source_type": "followed_creator",
+    "digest_status": "downloaded",
+    "media_status": "downloaded",
+    "temp_doc_id": null,
+    "local_play_url": "/data/videos/影视飓风/4K_HDR_拍摄实战教程_BV1example.mp4",
+    "watch_url": "https://www.bilibili.com/video/BV1example",
+    "author": "影视飓风"
+  },
+  {
+    "title": "GPT-5 技术架构深度解析",
+    "platform": "bilibili",
+    "url": "https://www.bilibili.com/video/BV2example",
+    "score": 0.72,
+    "signals": {
+      "relevance": 0.85,
+      "density": 0.6,
+      "freshness": 0.8,
+      "crossPlatform": 0.5,
+      "novelty": 0.65
+    },
+    "reason": "兴趣匹配度高",
+    "timestamp": "2026-05-01T08:30:00.000Z",
+    "content_type": "video",
+    "source_type": "keyword_hot",
+    "digest_status": "digested_pending",
+    "media_status": "subtitle_fetched",
+    "temp_doc_id": "kl-tmp-abc123",
+    "local_play_url": null,
+    "watch_url": "https://www.bilibili.com/video/BV2example",
+    "author": "某科技UP主"
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "project": "digist",
+  "generated_at": "2026-05-02T17:47:01.706Z",
+  "files": [
+    "checklists/checklist-concept-reference-management.md",
+    "checklists/checklist-entity-reference-directory.md",
+    "skills/skill-concept-reference-management.md",
+    "skills/skill-entity-reference-directory.md"
+  ]
+}

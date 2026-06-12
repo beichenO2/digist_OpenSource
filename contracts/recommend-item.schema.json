@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://polarisor.local/digist/contracts/recommend-item.schema.json",
+  "title": "RecommendItem",
+  "description": "推荐 API 返回的单条推荐项，包含 Clock 信息消费工作台所需的全部状态字段",
+  "type": "object",
+  "required": ["title", "platform", "url", "score", "content_type", "source_type", "digest_status"],
+  "properties": {
+    "title": { "type": "string" },
+    "platform": { "type": "string" },
+    "url": { "type": "string" },
+    "score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "signals": {
+      "type": "object",
+      "properties": {
+        "relevance": { "type": "number" },
+        "density": { "type": "number" },
+        "freshness": { "type": "number" },
+        "crossPlatform": { "type": "number" },
+        "novelty": { "type": "number" }
+      }
+    },
+    "reason": { "type": "string" },
+    "timestamp": { "type": "string" },
+    "content_type": {
+      "type": "string",
+      "enum": ["text", "video", "audio", "pdf", "image", "mixed"],
+      "description": "内容类型"
+    },
+    "source_type": {
+      "type": "string",
+      "enum": ["followed_creator", "keyword_hot", "keyword_latest", "big_hot", "api_crawl", "manual"],
+      "description": "来源类型"
+    },
+    "digest_status": {
+      "type": "string",
+      "enum": ["collected", "digesting", "digested_pending", "ingested", "archived", "not_interested", "downloaded"],
+      "description": "消化状态"
+    },
+    "media_status": {
+      "type": ["string", "null"],
+      "enum": ["subtitle_fetched", "audio_extracted", "asr_done", "downloaded", "failed", "pending", null],
+      "description": "视频处理状态"
+    },
+    "temp_doc_id": {
+      "type": ["string", "null"],
+      "description": "KnowLever 临时区文档 id（如已写入）"
+    },
+    "local_play_url": {
+      "type": ["string", "null"],
+      "description": "站内播放 URL（关注博主默认有）"
+    },
+    "watch_url": {
+      "type": ["string", "null"],
+      "description": "外部跳转 URL"
+    },
+    "author": { "type": "string" }
+  },
+  "additionalProperties": true
+}

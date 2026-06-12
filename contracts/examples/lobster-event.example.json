@@ -1,0 +1,56 @@
+[
+  {
+    "_description": "Bug event from API 5xx failure",
+    "ts": "2026-05-01T13:00:00.000Z",
+    "type": "bug",
+    "source_project": "digist",
+    "severity": "error",
+    "payload": {
+      "message": "SYNC_FAILED: KnowLever digest-sync.js exited with code 1",
+      "stack": "Error: SYNC_FAILED\n    at syncToKnowLever (server.ts:310)\n    ...",
+      "component": "api",
+      "operation": "sync-to-knowlever"
+    },
+    "dedup_key": "digist:bug:api:sync-to-knowlever:SYNC_FAILED: KnowLever digest-sync.js exi:2026-05-01"
+  },
+  {
+    "_description": "Report event with target_project routing",
+    "ts": "2026-05-01T14:00:00.000Z",
+    "type": "digist_report",
+    "source_project": "digist",
+    "target_project": "KnowLever",
+    "severity": "info",
+    "payload": {
+      "title": "Fusion Report: KnowLever ecosystem",
+      "topic": "knowlever",
+      "sources_count": 42,
+      "insights_count": 8
+    },
+    "dedup_key": "digist:digist_report:report:Fusion Report: KnowLever ecosystem:2026-05-01"
+  },
+  {
+    "_description": "Report event without target_project (general report)",
+    "ts": "2026-05-01T15:00:00.000Z",
+    "type": "digist_report",
+    "source_project": "digist",
+    "severity": "info",
+    "payload": {
+      "title": "Multi-Source Intelligence Report — 5/1/2026",
+      "sources_count": 120,
+      "insights_count": 15
+    },
+    "dedup_key": "digist:digist_report:report:Multi-Source Intelligence Report — 5/1/2026:2026-05-01"
+  },
+  {
+    "_description": "Health scan event from target test",
+    "ts": "2026-05-01T16:00:00.000Z",
+    "type": "scheduled_health_scan",
+    "source_project": "digist",
+    "severity": "info",
+    "payload": {
+      "test": true,
+      "ts": "2026-05-01T16:00:00.000Z"
+    },
+    "dedup_key": "digist:scheduled_health_scan:target_test:1746112800000:2026-05-01"
+  }
+]

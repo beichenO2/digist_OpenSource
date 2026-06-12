@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "digist/lobster-event",
+  "title": "DiGist Lobster Event",
+  "description": "Event emitted by digist via polarclaw-project-sdk to SOTAgent lobster event bus.",
+  "type": "object",
+  "required": ["ts", "type", "source_project", "severity", "payload", "dedup_key"],
+  "properties": {
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of event creation"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["bug", "digist_report", "contract_red", "git_push_main", "scheduled_health_scan"],
+      "description": "Event type aligned with SOTAgent_LobsterEvents.md canonical enum"
+    },
+    "source_project": {
+      "type": "string",
+      "const": "digist",
+      "description": "Always 'digist' for events from this project"
+    },
+    "target_project": {
+      "type": "string",
+      "description": "Optional target project for routed events (e.g. digist_report targeting KnowLever)"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["info", "warn", "error", "critical"]
+    },
+    "payload": {
+      "type": "object",
+      "description": "Event-specific data; structure varies by type"
+    },
+    "dedup_key": {
+      "type": "string",
+      "description": "Deduplication key; PolarClaw uses this to avoid duplicate processing"
+    }
+  },
+  "additionalProperties": false
+}
