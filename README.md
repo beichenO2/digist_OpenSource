@@ -4,6 +4,14 @@
 
 Polarisor 生态的**信息输入层**，为 KnowLever、LLMWiki、Lobster 提供预处理后的结构化数据。
 
+## 页面预览
+
+> 截图位于 `screenshots/`，均为 DiGist 信息页实拍。
+
+![每日信息 — 热点摘要与 arXiv 条目](screenshots/digist-01-daily-feed.png)
+
+![证据条目 — 多平台采集与摘要入库](screenshots/digist-02-evidence.png)
+
 ## 快速开始
 
 ```bash
