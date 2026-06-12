@@ -1,9 +1,3 @@
-#!/bin/bash
-set -euo pipefail
-
-if pgrep -f "daily-digest" > /dev/null 2>&1; then
-    echo "running"
-    exit 0
-fi
-echo "stopped"
-exit 1
+#!/usr/bin/env bash
+# Thin wrapper — delegates to start.sh status (PolarProcess looks up status.sh).
+exec "$(cd "$(dirname "$0")" && pwd)/start.sh" status

@@ -1,5 +1,3 @@
-#!/bin/bash
-set -euo pipefail
-
-pkill -f "daily-digest" 2>/dev/null || true
-exit 0
+#!/usr/bin/env bash
+# Thin wrapper — delegates to start.sh stop (PolarProcess looks up stop.sh).
+exec "$(cd "$(dirname "$0")" && pwd)/start.sh" stop

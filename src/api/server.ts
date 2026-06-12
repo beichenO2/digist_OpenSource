@@ -8,9 +8,26 @@ import http from 'node:http';
 import { mkdirSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
+import { homedir } from 'node:os';
 import { URL } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+
+// digist-api can be launched with a minimal PATH (e.g. via nohup/launchd) that
+// lacks Homebrew / venv bin dirs, which breaks spawned tools such as yt-dlp,
+// ffmpeg and ffprobe ("spawn yt-dlp ENOENT"). Prepend the common tool locations
+// so child processes resolve them regardless of how the server was started.
+{
+  const extraDirs = [
+    ...(process.env.DIGIST_TOOL_PATH?.split(':').filter(Boolean) ?? []),
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+    resolve(homedir(), '.agent-reach-venv', 'bin'),
+  ];
+  const current = (process.env.PATH ?? '').split(':');
+  const missing = extraDirs.filter((d) => existsSync(d) && !current.includes(d));
+  if (missing.length > 0) process.env.PATH = [...missing, ...current].filter(Boolean).join(':');
+}
 import { Storage } from '../storage/index.js';
 import { crawl, crawlPlatforms, type CrawlPlatform } from './crawl-api.js';
 import { normalizeBatch, deduplicateByUrl } from '../normalizer/index.js';
@@ -120,11 +137,14 @@ const server = http.createServer(async (req, res) => {
         500,
         Math.max(1, limitRaw ? Number.parseInt(limitRaw, 10) || 20 : 20),
       );
+      const q = u.searchParams.get('q')?.trim();
       if (!storage) {
         json(res, 200, { items: [] });
         return;
       }
-      const rows = storage.listContent(undefined, limit, 0);
+      const rows = q
+        ? storage.searchContent(q, limit)
+        : storage.listContent(undefined, limit, 0);
       const items = rows.map((r) => ({
         id: r.id,
         title: r.title,
@@ -132,7 +152,7 @@ const server = http.createServer(async (req, res) => {
         timestamp: r.timestamp,
         source_url: r.source_url,
       }));
-      json(res, 200, { items });
+      json(res, 200, q ? { items, search: q } : { items });
       return;
     }
 

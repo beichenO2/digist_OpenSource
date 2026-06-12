@@ -15,8 +15,11 @@ npx tsx src/cli.ts scrape arxiv "large language model"
 npx tsx src/cli.ts scrape hackernews ""
 npx tsx src/cli.ts scrape github "trending"
 
-# 启动 HTTP API (port 4880, PolarPort SSOT)
+# 启动 HTTP API (port 3800, SOTAgent/PolarPort SSOT)
 npm run digist-api
+
+# macOS 常驻（推荐，与网关 target_port 3800 对齐）
+bash scripts/install-api-launchd.sh
 
 # 启动完整引擎 (调度器 + 进化 + 报告)
 npm run start
@@ -32,7 +35,7 @@ npm run summarize
 ├── arxiv      (API 直连)  →                  ├── density-evaluator  ├── fusion reports
 ├── hackernews (API 直连)  →   SQLite          ├── knowledge-graph    ├── daily digest
 ├── reddit     (API 直连)  →   (FTS5)          ├── semantic-linker    ├── wiki compile
-├── github     (HTTP)      →                  └── conflict-detector  └── HTTP API (:4880)
+├── github     (HTTP)      →                  └── conflict-detector  └── HTTP API (:3800)
 ├── twitter    (OpenCLI)   →
 ├── xiaohongshu(OpenCLI)   →    进化层
 ├── zhihu      (OpenCLI)   →    ├── strategy-optimizer

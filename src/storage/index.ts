@@ -279,14 +279,62 @@ export class Storage {
   }
 
   searchContent(query: string, limit = 50): ContentItem[] {
-    const rows = this.db.prepare(`
-      SELECT c.* FROM content_items c
-      JOIN content_fts f ON c.rowid = f.rowid
-      WHERE content_fts MATCH ?
-      ORDER BY rank
-      LIMIT ?
-    `).all(query, limit) as any[];
-    return rows.map(r => this.rowToContentItem(r));
+    const terms = query
+      .trim()
+      .split(/[\s,，、；;]+/)
+      .map((t) => t.trim())
+      .filter((t) => t.length >= 2 || /[\u4e00-\u9fff]/.test(t));
+    if (terms.length === 0) return [];
+
+    // FTS5: OR-join terms so multi-word / CJK queries don't require exact phrase match
+    const ftsQuery = terms.map((t) => `"${t.replace(/"/g, '""')}"`).join(' OR ');
+    let rows: any[] = [];
+    try {
+      rows = this.db.prepare(`
+        SELECT c.* FROM content_items c
+        JOIN content_fts f ON c.rowid = f.rowid
+        WHERE content_fts MATCH ?
+        ORDER BY rank
+        LIMIT ?
+      `).all(ftsQuery, Math.max(limit * 3, limit)) as any[];
+    } catch {
+      rows = [];
+    }
+
+    // Fallback: LIKE on title/body when FTS misses (common for sparse CJK tokenization)
+    if (rows.length < Math.min(limit, 3)) {
+      const seen = new Set(rows.map((r) => r.id as string));
+      for (const term of terms) {
+        const like = `%${term}%`;
+        const extra = this.db.prepare(`
+          SELECT * FROM content_items
+          WHERE title LIKE ? OR body_markdown LIKE ?
+          ORDER BY timestamp DESC
+          LIMIT ?
+        `).all(like, like, limit * 2) as any[];
+        for (const row of extra) {
+          if (!seen.has(row.id)) {
+            seen.add(row.id);
+            rows.push(row);
+          }
+        }
+      }
+    }
+
+    const scored = rows.map((row) => {
+      const title = String(row.title ?? '').toLowerCase();
+      const body = String(row.body_markdown ?? '').toLowerCase();
+      let score = 0;
+      for (const term of terms) {
+        const t = term.toLowerCase();
+        if (title.includes(t)) score += 3;
+        if (body.includes(t)) score += 1;
+      }
+      return { row, score };
+    });
+    scored.sort((a, b) => b.score - a.score || String(b.row.timestamp).localeCompare(String(a.row.timestamp)));
+
+    return scored.slice(0, limit).map(({ row }) => this.rowToContentItem(row));
   }
 
   listContent(platform?: string, limit = 100, offset = 0): ContentItem[] {
