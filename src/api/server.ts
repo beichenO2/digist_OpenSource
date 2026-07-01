@@ -45,6 +45,35 @@ const DB_PATH = process.env.DIGIST_DB || './data/digist.sqlite';
 
 const noQueryPlatforms = new Set<string>(['glass', 'hackernews', 'bloomberg']);
 
+type VideoDigestJob = {
+  status: 'pending' | 'running' | 'done' | 'failed';
+  url: string;
+  startedAt: number;
+  durationSeconds?: number;
+  result?: {
+    title: string;
+    method: string;
+    duration_seconds: number;
+    transcript_preview: string;
+    summary_preview: string;
+    has_transcript: boolean;
+    has_summary: boolean;
+    knowlever?: { pushed: boolean; topic: string };
+  };
+  error?: string;
+};
+
+const videoDigestJobs = new Map<string, VideoDigestJob>();
+
+function videoDigestJobKey(url: string): string {
+  return url.trim();
+}
+
+function pollTimeoutMs(durationSeconds?: number): number {
+  const base = durationSeconds && durationSeconds > 0 ? durationSeconds : 600;
+  return Math.max(120_000, base * 3 * 1000);
+}
+
 type DbMeta = {
   status: 'connected' | 'degraded';
   path: string;
@@ -588,7 +617,27 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // Video digest: download → transcribe → summarize → optionally push to KnowLever
+    // Video digest: async background job — returns 202 immediately
+    if (req.method === 'GET' && path === '/api/video/digest/status') {
+      const url = u.searchParams.get('url')?.trim();
+      if (!url) { jsonError(res, 400, 'URL_REQUIRED', 'url query param is required'); return; }
+      const job = videoDigestJobs.get(videoDigestJobKey(url));
+      if (!job) {
+        json(res, 200, { status: 'unknown', url, poll_timeout_ms: pollTimeoutMs() });
+        return;
+      }
+      const payload: Record<string, unknown> = {
+        status: job.status,
+        url: job.url,
+        poll_timeout_ms: pollTimeoutMs(job.durationSeconds ?? job.result?.duration_seconds),
+      };
+      if (job.durationSeconds) payload.duration_seconds = job.durationSeconds;
+      if (job.result) Object.assign(payload, job.result);
+      if (job.error) payload.error = job.error;
+      json(res, 200, payload);
+      return;
+    }
+
     if (req.method === 'POST' && path === '/api/video/digest') {
       let raw: string;
       try { raw = await readBody(req); } catch { jsonError(res, 413, 'PAYLOAD_TOO_LARGE', 'Request body exceeds size limit'); return; }
@@ -596,35 +645,74 @@ const server = http.createServer(async (req, res) => {
       try { body = JSON.parse(raw); } catch { jsonError(res, 400, 'INVALID_JSON', 'Request body is not valid JSON'); return; }
       if (!body.url) { jsonError(res, 400, 'URL_REQUIRED', 'url field is required'); return; }
 
-      const { digestVideo } = await import('../preprocess/video-digest.js');
-
-      try {
-        const result = await digestVideo(body.url, { forceAsr: body.force_asr ?? false });
-        const response: Record<string, unknown> = {
-          title: result.title,
-          method: result.method,
-          duration_seconds: result.durationSeconds,
-          transcript_preview: result.transcript.slice(0, 500),
-          summary_preview: result.summary.slice(0, 1000),
-          has_transcript: result.transcript.length > 0,
-          has_summary: result.summary.length > 0,
-        };
-
-        if (body.push_knowlever !== false) {
-          const { pushVideoToKnowLever } = await import('../knowlever-push.js');
-          const topic = body.topic || 'video-digests';
-          const pushResult = pushVideoToKnowLever(
-            result.videoPath, result.summaryPath, result.transcriptPath,
-            result.title, { topic },
-          );
-          response.knowlever = { pushed: pushResult.pushed, topic };
-        }
-
-        json(res, 200, response);
-      } catch (err: any) {
-        jsonError(res, 500, 'DIGEST_FAILED', err.message?.slice(0, 500) || String(err));
-        emitBug(err, { component: 'api', operation: 'video-digest', url: body.url }).catch(() => {});
+      const jobKey = videoDigestJobKey(body.url);
+      const existing = videoDigestJobs.get(jobKey);
+      if (existing && (existing.status === 'pending' || existing.status === 'running')) {
+        json(res, 202, {
+          status: 'already_running',
+          url: body.url,
+          poll_timeout_ms: pollTimeoutMs(existing.durationSeconds),
+        });
+        return;
       }
+
+      const itemId = storage?.findContentIdByUrl(body.url) ?? null;
+      if (itemId) storage!.updateContentStatus(itemId, { digest_status: 'digesting' });
+
+      videoDigestJobs.set(jobKey, {
+        status: 'pending',
+        url: body.url,
+        startedAt: Date.now(),
+      });
+
+      json(res, 202, {
+        status: 'started',
+        url: body.url,
+        poll_timeout_ms: pollTimeoutMs(),
+      });
+
+      void (async () => {
+        const job = videoDigestJobs.get(jobKey)!;
+        job.status = 'running';
+        const { digestVideo } = await import('../preprocess/video-digest.js');
+        try {
+          const result = await digestVideo(body.url, { forceAsr: body.force_asr ?? false });
+          job.durationSeconds = result.durationSeconds;
+          const response: VideoDigestJob['result'] = {
+            title: result.title,
+            method: result.method,
+            duration_seconds: result.durationSeconds,
+            transcript_preview: result.transcript.slice(0, 500),
+            summary_preview: result.summary.slice(0, 1000),
+            has_transcript: result.transcript.length > 0,
+            has_summary: result.summary.length > 0,
+          };
+
+          if (body.push_knowlever !== false) {
+            const { pushVideoToKnowLever } = await import('../knowlever-push.js');
+            const topic = body.topic || 'video-digests';
+            const pushResult = pushVideoToKnowLever(
+              result.videoPath, result.summaryPath, result.transcriptPath,
+              result.title, { topic },
+            );
+            response.knowlever = { pushed: pushResult.pushed, topic };
+          }
+
+          job.result = response;
+          job.status = 'done';
+          if (itemId) {
+            storage?.updateContentStatus(itemId, {
+              digest_status: 'digested_pending',
+              media_status: result.mediaStatus,
+            });
+          }
+        } catch (err: any) {
+          job.status = 'failed';
+          job.error = err.message?.slice(0, 500) || String(err);
+          if (itemId) storage?.updateContentStatus(itemId, { digest_status: 'collected' });
+          emitBug(err, { component: 'api', operation: 'video-digest', url: body.url }).catch(() => {});
+        }
+      })();
       return;
     }
 

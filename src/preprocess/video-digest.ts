@@ -14,7 +14,12 @@ const execAsync = promisify(exec);
 const POLARPRIVATE_URL = process.env.POLARPRIVATE_URL || 'http://127.0.0.1:12790';
 const DEFAULT_MODEL = '0010';
 
-const YTDLP_BASE_ARGS = ['--cookies-from-browser', 'chrome'];
+/** Cookie args for yt-dlp. Omit by default — launchd/PolarProcess daemons cannot read Safari cookies. */
+function ytDlpBaseArgs(): string[] {
+  const browser = process.env.YTDLP_COOKIES_BROWSER?.trim();
+  if (!browser || browser === 'none') return [];
+  return ['--cookies-from-browser', browser];
+}
 
 export type DownloadStrategy = 'subtitle_only' | 'audio_asr' | 'full_video' | 'auto';
 export type MediaStatus = 'pending' | 'subtitle_fetched' | 'audio_extracted' | 'asr_done' | 'downloaded' | 'failed';
@@ -179,7 +184,7 @@ async function fetchSubtitleOnly(
 ): Promise<{ title: string; transcript: string; videoPath: string | null } | null> {
   try {
     const args = [
-      ...YTDLP_BASE_ARGS,
+      ...ytDlpBaseArgs(),
       '--skip-download',
       '--write-subs', '--write-auto-subs',
       '--sub-langs', 'zh-Hans,zh-Hant,zh,en',
@@ -222,7 +227,7 @@ async function fetchAudioForAsr(
 ): Promise<{ audioPath: string; title: string } | null> {
   try {
     const args = [
-      ...YTDLP_BASE_ARGS,
+      ...ytDlpBaseArgs(),
       '-f', 'bestaudio/best',
       '-x', '--audio-format', 'wav',
       '--postprocessor-args', 'ffmpeg:-ar 16000 -ac 1',
@@ -258,7 +263,7 @@ async function downloadWithSubtitles(
   outDir: string,
 ): Promise<{ videoPath: string; title: string }> {
   const args = [
-    ...YTDLP_BASE_ARGS,
+    ...ytDlpBaseArgs(),
     '-f', 'bestvideo[height<=720]+bestaudio/best[height<=720]',
     '--merge-output-format', 'mp4',
     '-o', join(outDir, '%(title).80s [%(id)s].%(ext)s'),

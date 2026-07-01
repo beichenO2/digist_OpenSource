@@ -10,6 +10,8 @@
 set -euo pipefail
 
 DIGIST_DIR="$HOME/Polarisor/digist"
+# shellcheck source=ensure-node.sh
+source "$DIGIST_DIR/scripts/ensure-node.sh" "$DIGIST_DIR"
 LOG_DIR="$DIGIST_DIR/data/logs"
 OUTPUT_DIR="$DIGIST_DIR/data/daily"
 DATE=$(date +%Y-%m-%d)
@@ -114,10 +116,10 @@ except subprocess.TimeoutExpired:
 PY
 }
 
-# --- Phase 1: API-direct platforms (no OpenCLI dependency) ---
+# --- Phase 1: API-direct platforms ---
 # These are always safe and have generous rate limits.
 
-log "[Phase 1] API-direct platforms (no OpenCLI needed)"
+log "[Phase 1] API-direct platforms"
 
 TOTAL=0
 FAILED=0
@@ -129,7 +131,7 @@ run_scrape() {
 
   log "Scraping [$platform] '$query' (limit=$MAX_ITEMS_PER_SCRAPE)..."
 
-  if cd "$DIGIST_DIR" && run_with_timeout 120 npx tsx src/cli.ts scrape "$platform" "$query" 2>&1 | tee -a "$LOG_DIR/digest-$DATE.log"; then
+  if cd "$DIGIST_DIR" && run_with_timeout 120 bash bin/digist scrape "$platform" "$query" 2>&1 | tee -a "$LOG_DIR/digest-$DATE.log"; then
     TOTAL=$((TOTAL + 1))
     log "  ✓ $platform done"
   else
@@ -152,23 +154,14 @@ run_scrape github "trending" "$INTER_PLATFORM_DELAY"
 run_scrape youtube "AI agent framework" "$INTER_PLATFORM_DELAY"
 run_scrape youtube "quantitative trading crypto" "$INTER_PLATFORM_DELAY"
 
-# --- Phase 2: Browser-based platforms ---
-# Fallback chain: OpenCLI (Chrome bridge) → Playwright (headless) → Firecrawl (self-hosted)
-# The CLI auto-detects availability and picks the best scraper.
-
-OPENCLI_OK=false
-OPENCLI_DOCTOR="$(opencli doctor 2>/dev/null || true)"
-if [[ "$OPENCLI_DOCTOR" == *"Everything looks good"* ]]; then
-  OPENCLI_OK=true
-  log "[Phase 2] OpenCLI bridge connected → browser platforms via OpenCLI"
-else
-  log "[Phase 2] OpenCLI bridge not connected → CLI will auto-fallback to Playwright or Firecrawl"
-fi
+# --- Phase 2: Safari-based platforms (twitter/zhihu/xiaohongshu/bilibili/bloomberg) ---
+log "[Phase 2] Safari scraper platforms (requires macOS + Safari login + Allow JS from Apple Events)"
 
 BROWSER_DELAY=$((INTER_PLATFORM_DELAY * 2))
 
-run_scrape twitter "cryptocurrency trading" "$BROWSER_DELAY"
-run_scrape twitter "AI research frontier paper" "$BROWSER_DELAY"
+# twitter/X disabled — account suspended, no viable access (see risk-window-policy.ts)
+# run_scrape twitter "cryptocurrency trading" "$BROWSER_DELAY"
+# run_scrape twitter "AI research frontier paper" "$BROWSER_DELAY"
 run_scrape bloomberg "economics markets" "$BROWSER_DELAY"
 run_scrape xiaohongshu "加密货币 量化交易" "$BROWSER_DELAY"
 run_scrape zhihu "量化交易策略" "$BROWSER_DELAY"

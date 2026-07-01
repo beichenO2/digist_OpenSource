@@ -13,6 +13,7 @@ import { wechatRssScraper as wechatScraper } from '../scrapers/wechat-rss.js';
 import { arxivScraper } from '../scrapers/arxiv.js';
 import { hackerNewsScraper as hackernewsScraper } from '../scrapers/hackernews.js';
 import { youtubeScraper } from '../scrapers/youtube.js';
+import { canScrapePlatformNow } from '../scheduler/risk-window-policy.js';
 import type { Scraper, ScraperOptions, ScraperResult } from '../types/index.js';
 
 export const crawlPlatforms = [
@@ -50,6 +51,11 @@ export async function crawl(
   query: string,
   options?: ScraperOptions,
 ): Promise<ScraperResult> {
+  const policy = canScrapePlatformNow(platform);
+  if (!policy.allowed) {
+    throw new Error(policy.reason ?? `${platform} is temporarily disabled`);
+  }
+
   const s = scrapers[platform];
   if (!s) {
     throw new Error(`Unknown platform: ${platform}. Expected one of: ${crawlPlatforms.join(', ')}`);

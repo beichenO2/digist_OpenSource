@@ -837,6 +837,12 @@ export class Storage {
     };
   }
 
+  findContentIdByUrl(url: string): string | null {
+    const hash = this.urlHash(url);
+    const row = this.db.prepare('SELECT id FROM content_items WHERE url_hash = ?').get(hash) as { id?: string } | undefined;
+    return row?.id ?? null;
+  }
+
   // Content status updates
 
   updateContentStatus(id: string, update: {

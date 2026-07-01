@@ -7,7 +7,7 @@ import axios from 'axios';
 
 const LLM_PROXY_V1 =
   process.env.POLARPRIVATE_URL?.replace(/\/$/, '') ||
-  `http://127.0.0.1:${process.env.POLARPRIVATE_PORT ?? '8005'}`;
+  `http://127.0.0.1:${process.env.POLARPRIVATE_PORT ?? '12790'}`;
 const LLM_V1 = `${LLM_PROXY_V1}/v1`;
 
 function resolveModel(capability?: string): string {

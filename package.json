@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "AI self-evolution information digestion engine",
   "type": "module",
+  "bin": {
+    "digist": "./bin/digist"
+  },
   "exports": {
     ".": "./dist/index.js",
     "./crawl-api": "./dist/api/crawl-api.js",
@@ -12,7 +15,8 @@
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "scrape": "tsx src/cli.ts",
+    "postinstall": "bash scripts/postinstall-native.sh",
+    "scrape": "bash bin/digist scrape",
     "digist-api": "tsx src/api/server.ts",
     "digist-api:watch": "tsx watch src/api/server.ts",
     "summarize": "tsx scripts/summarize-daily.ts",

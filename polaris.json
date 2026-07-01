@@ -12,7 +12,7 @@
     {
       "id": "R1",
       "need": "多平台信息自动爬取与存储",
-      "approach": "API + OpenCLI 双通道爬取，SQLite + FTS5 持久化，调度器管理抓取频率",
+      "approach": "API + Safari 双通道爬取，SQLite + FTS5 持久化，调度器管理抓取频率",
       "features": [
         {
           "name": "API 爬取",
@@ -36,16 +36,18 @@
         },
         {
           "name": "浏览器平台爬取",
-          "description": "OpenCLI Chrome Bridge + Firecrawl 自托管回退 + 高风险平台时间窗",
+          "description": "Safari AppleScript 抓取 + Firecrawl 自托管回退 + 高风险平台时间窗",
           "status": "done",
           "behavior": [
-            "OpenCLI Chrome 桥接为首选方案（需安装 Browser Bridge extension）",
-            "Firecrawl 自托管为回退方案（Docker 本地部署，无需外部 API key）",
-            "Playwright 仅用于通用 URL 抓取（公开页面），不支持需要登录的社交平台",
-            "CLI scrape 命令自动检测 OpenCLI bridge 状态，不可用时切换 Firecrawl",
-            "daily-digest.sh 始终执行 browser 平台爬取，回退由 CLI 层处理",
-            "twitter/X 和 zhihu 强制走 OpenCLI，抓取窗口限制在 01:00-07:00（Asia/Shanghai），通过 risk-window-policy.ts 统一控制",
-            "DIGIST_RISK_WINDOW_START_HOUR / DIGIST_RISK_WINDOW_END_HOUR / DIGIST_POLICY_TZ 环境变量可覆盖默认时间窗配置"
+            "Safari AppleScript 为首选方案（复用用户 Safari 登录态，需 Allow JavaScript from Apple Events）",
+            "Firecrawl 自托管为回退方案（Docker 本地部署，公开页面）",
+            "CLI scrape 命令对 twitter/zhihu/xiaohongshu/bilibili/bloomberg 走 safari-scraper.ts",
+            "daily-digest.sh Phase 2 执行 Safari 平台爬取（twitter 当前已跳过）",
+            "twitter/X 和 zhihu 抓取窗口限制在 01:00-07:00（Asia/Shanghai），通过 risk-window-policy.ts 统一控制",
+            "DIGIST_RISK_WINDOW_START_HOUR / DIGIST_RISK_WINDOW_END_HOUR / DIGIST_POLICY_TZ 环境变量可覆盖默认时间窗配置",
+            "twitter/X 当前已禁用（账号被封，暂无可用访问方式）：risk-window-policy.ts 的 DEFAULT_DISABLED_PLATFORMS 含 twitter；调度器/CLI/API/daily-digest 均会跳过",
+            "DIGIST_DISABLED_PLATFORMS 环境变量可覆盖禁用列表（逗号分隔）；设为 \"\" 可启用全部平台",
+            "恢复 twitter/X 抓取步骤：① 去掉 DEFAULT_DISABLED_PLATFORMS 中的 twitter（或设 DIGIST_DISABLED_PLATFORMS=\"\"）；② 执行 UPDATE scrape_jobs SET enabled=1 WHERE platform='twitter'；③ 取消 daily-digest.sh Phase 2 中 twitter 两行注释；④ 重启 digist-api"
           ],
           "test_status": "not_tested",
           "evidence": [
@@ -434,7 +436,8 @@
   ],
   "service_management": {
     "health_endpoint": "http://127.0.0.1:3800/health?fast=1",
-    "restart_command": "cd ~/Polarisor/digist && nohup npx tsx src/api/server.ts > data/logs/api-stdout.log 2>&1 &",
+    "start_script_dir": "Start",
+    "restart_command": "bash ~/Polarisor/digist/Start/restart.sh",
     "port": 3800,
     "auto_start": true
   },

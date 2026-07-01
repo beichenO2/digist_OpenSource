@@ -24,22 +24,13 @@ PORT=$(claim_port "$SERVICE_NAME" "$PROJECT" "$PREFERRED_PORT")
 HEALTH_URL="http://127.0.0.1:${PORT}/api/health"
 
 # ── Node version alignment (engines.node >= 22) ──────────
-REQUIRED_NODE=""
-if [ -f ".nvmrc" ]; then
-    REQUIRED_NODE=$(cat .nvmrc)
-elif [ -f "package.json" ]; then
-    REQUIRED_NODE=$(node -e "try{const p=require('./package.json');const e=p.engines?.node||'';const m=e.match(/>=(\d+)/);console.log(m?m[1]:'')}catch{}" 2>/dev/null || true)
-fi
-if [ -n "${REQUIRED_NODE:-}" ] && [ -d "$HOME/.nvm/versions/node" ]; then
-    NODE_DIR=$(ls -d "$HOME/.nvm/versions/node/v${REQUIRED_NODE}"* 2>/dev/null | sort -V | tail -1 || true)
-    if [ -n "$NODE_DIR" ] && [ -x "$NODE_DIR/bin/node" ]; then
-        export PATH="$NODE_DIR/bin:$PATH"
-    fi
-fi
+source "$PROJECT_DIR/scripts/ensure-node.sh" "$PROJECT_DIR"
+NODE_BIN="$(command -v node)"
+NPM_BIN="$(dirname "$NODE_BIN")/npm"
 
 # ── External tools (yt-dlp / ffmpeg / ffprobe) on PATH ───
-# digestVideo shells out to these; ensure they resolve regardless of launcher.
-export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.agent-reach-venv/bin:$PATH"
+# Append only — do not prepend homebrew before nvm node/npm.
+export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:$HOME/.agent-reach-venv/bin"
 
 LOG_FILE="$PROJECT_DIR/data/logs/api-stdout.log"
 mkdir -p "$PROJECT_DIR/data/logs"
@@ -66,16 +57,16 @@ do_start() {
     fi
 
     if [ ! -d "node_modules" ] || [ "package.json" -nt "node_modules/.package-lock.json" ]; then
-        echo "Installing dependencies..."
-        npm ci 2>&1 || npm install 2>&1
+        echo "Installing dependencies with $("$NODE_BIN" -v)..."
+        "$NPM_BIN" ci --include=dev 2>&1 || "$NPM_BIN" install 2>&1
     fi
 
-    local node_bin tsx_bin
-    node_bin="$(command -v node)"
+    local tsx_bin
     tsx_bin="$PROJECT_DIR/node_modules/.bin/tsx"
 
     export PORT
-    python3 -c "$SETSID_EXEC" "$node_bin" "$tsx_bin" src/api/server.ts >> "$LOG_FILE" 2>&1 < /dev/null &
+    export POLARPRIVATE_URL="${POLARPRIVATE_URL:-http://127.0.0.1:12790}"
+    python3 -c "$SETSID_EXEC" "$NODE_BIN" "$tsx_bin" src/api/server.ts >> "$LOG_FILE" 2>&1 < /dev/null &
     DAEMON_PID=$!
     echo "$DAEMON_PID" > "$PID_FILE"
 

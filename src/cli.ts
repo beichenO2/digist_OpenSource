@@ -71,6 +71,12 @@ async function main() {
           break;
         }
 
+        const policy = canScrapePlatformNow(platform);
+        if (!policy.allowed) {
+          console.log(`Skipped ${platform}: ${policy.reason}`);
+          break;
+        }
+
         const SAFARI_PLATFORMS = new Set(['twitter', 'xiaohongshu', 'zhihu', 'bilibili', 'bloomberg']);
         let activeScraper = scraper;
         let maxItems = SAFARI_PLATFORMS.has(platform) ? 10 : 20;

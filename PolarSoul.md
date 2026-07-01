@@ -8,10 +8,10 @@
 
 | 特质 | 与社区同类项目的差异 |
 |------|----------------------|
-| **多平台爬取** | 支持 arxiv/HN/reddit/github/bilibili/youtube/wechat 等多平台，API + OpenCLI 双通道 |
+| **多平台爬取** | 支持 arxiv/HN/reddit/github/bilibili/youtube/wechat 等多平台，API + Safari 双通道 |
 | **融合引擎** | Louvain 社区检测 + 4 信号相关度模型，发现"惊人连接"和"Gap" |
 | **视频消化三阶管道** | 字幕提取 → 音频 ASR → 完整下载，按需降级 |
-| **高风险平台时间窗** | twitter/X、知乎强制走 OpenCLI，抓取窗口限制在 01:00-07:00 |
+| **高风险平台时间窗** | twitter/X、知乎强制走 Safari，抓取窗口限制在 01:00-07:00 |
 
 ---
 
@@ -72,7 +72,7 @@
 
 **问题**：twitter/X、知乎等平台有反爬机制，白天抓取风险高。
 
-**决策**：强制走 OpenCLI（浏览器模拟），抓取窗口限制在 01:00-07:00（Asia/Shanghai）。
+**决策**：强制走 Safari AppleScript（复用登录态），抓取窗口限制在 01:00-07:00（Asia/Shanghai）。
 
 **不可妥协**：时间窗外不得抓取高风险平台。
 

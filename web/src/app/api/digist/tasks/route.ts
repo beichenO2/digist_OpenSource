@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStorage } from "@/lib/digist-data";
-import { getDataDir } from "@/lib/digist-paths";
+import { getDataDir, digistExecEnv } from "@/lib/digist-paths";
 import { execFile } from "child_process";
 import { join } from "path";
 import { promisify } from "util";
@@ -50,12 +50,11 @@ async function runTsx(
     cwd: DIGIST_ROOT,
     timeout,
     maxBuffer: 20 * 1024 * 1024,
-    env: {
-      ...process.env,
+    env: digistExecEnv({
       DIGIST_DATA_DIR: getDataDir(),
       DIGIST_DB: process.env.DIGIST_DB || join(getDataDir(), "digist.sqlite"),
       ...extraEnv,
-    },
+    }),
   });
   return { stdout: stdout.trim(), stderr: stderr.trim() || undefined };
 }
@@ -65,11 +64,10 @@ async function runDigistCli(args: string[], timeout = 600_000): Promise<{ stdout
     cwd: DIGIST_ROOT,
     timeout,
     maxBuffer: 20 * 1024 * 1024,
-    env: {
-      ...process.env,
+    env: digistExecEnv({
       DIGIST_DATA_DIR: getDataDir(),
       DIGIST_DB: process.env.DIGIST_DB || join(getDataDir(), "digist.sqlite"),
-    },
+    }),
   });
   return { stdout: stdout.trim(), stderr: stderr.trim() || undefined };
 }
