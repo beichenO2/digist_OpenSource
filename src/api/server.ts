@@ -695,7 +695,7 @@ const server = http.createServer(async (req, res) => {
               result.videoPath, result.summaryPath, result.transcriptPath,
               result.title, { topic },
             );
-            response.knowlever = { pushed: pushResult.pushed, topic };
+            response.knowlever = { pushed: pushResult.pushed.length > 0, topic };
           }
 
           job.result = response;
@@ -917,9 +917,10 @@ if (!portReady) {
 let smartScheduler: SmartScheduler | null = null;
 
 if (storage && process.env.DIGIST_SMART_SCHEDULER !== '0') {
-  smartScheduler = new SmartScheduler(storage);
+  const store = storage;
+  smartScheduler = new SmartScheduler(store);
   smartScheduler.onNewItems = () => {
-    backgroundRefresh(storage, new Date().toISOString().slice(0, 10));
+    backgroundRefresh(store, new Date().toISOString().slice(0, 10));
   };
   smartScheduler.start();
   console.log('[digist-api] SmartScheduler enabled — platforms auto-schedule based on per-platform intervals');

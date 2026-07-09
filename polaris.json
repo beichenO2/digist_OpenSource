@@ -435,11 +435,12 @@
     "KnowLever"
   ],
   "service_management": {
-    "health_endpoint": "http://127.0.0.1:3800/health?fast=1",
+    "health_endpoint": "http://127.0.0.1:3800/api/health",
     "start_script_dir": "Start",
     "restart_command": "bash ~/Polarisor/digist/Start/restart.sh",
     "port": 3800,
-    "auto_start": true
+    "auto_start": true,
+    "notes": "QA: `npm test` (edge+all+scrapers+perf). Auto-Evolve: PolarProcess cron `digist-auto-evolve` every 3d 05:00 — QA-gated minor/patch upgrades via Agent_core/scripts/auto-evolve.mjs; auto-restart + health rollback."
   },
   "contacts": {
     "last_updated": "2026-05-01T22:08+08:00",
