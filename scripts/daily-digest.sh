@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Daily digest: scrape content across all platforms with even distribution
-# Called by launchd on a schedule (see com.digist.daily-digest.plist)
+# Daily digest: scrape content across all platforms with even distribution.
+# Scheduled via SOTAgent cron `digist-daily-digest` (launchd retired 2026-06-12).
 #
 # KEY DESIGN: scrapes are spread evenly with configurable delays between each
 # platform to avoid burst traffic and account bans.
 #
-# Schedule: 08:00, 11:00, 14:00, 17:00, 20:00, 23:00, 06:00 (next day)
+# Phase 1 = L1 open/免登 platforms (arxiv/hackernews/reddit/github/v2ex/bilibili/youtube).
+# Phase 2 = Safari→L3 fallback platforms (bloomberg/zhihu/xiaohongshu; twitter disabled).
+# Schedule: 06:00, 08:00, 11:00, 14:00, 17:00, 20:00, 23:00
 
 set -euo pipefail
 
@@ -151,10 +153,13 @@ run_scrape hackernews "" "$INTER_PLATFORM_DELAY"
 run_scrape arxiv "large language model agent" "$INTER_PLATFORM_DELAY"
 run_scrape reddit "artificial intelligence" "$INTER_PLATFORM_DELAY"
 run_scrape github "trending" "$INTER_PLATFORM_DELAY"
+run_scrape v2ex "hot" "$INTER_PLATFORM_DELAY"
+run_scrape bilibili "hot" "$INTER_PLATFORM_DELAY"
 run_scrape youtube "AI agent framework" "$INTER_PLATFORM_DELAY"
 run_scrape youtube "quantitative trading crypto" "$INTER_PLATFORM_DELAY"
 
-# --- Phase 2: Safari-based platforms (twitter/zhihu/xiaohongshu/bilibili/bloomberg) ---
+# --- Phase 2: Safari-based platforms (twitter/zhihu/xiaohongshu/bloomberg) ---
+# bilibili moved to Phase 1 (open-API, no browser); twitter disabled (banned).
 log "[Phase 2] Safari scraper platforms (requires macOS + Safari login + Allow JS from Apple Events)"
 
 BROWSER_DELAY=$((INTER_PLATFORM_DELAY * 2))

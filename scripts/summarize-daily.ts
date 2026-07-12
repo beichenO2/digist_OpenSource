@@ -16,7 +16,10 @@ const DB_PATH = process.env.DIGIST_DB || './data/digist.sqlite';
 const DIGIST_TIME_ZONE = process.env.DIGIST_TIME_ZONE || 'Asia/Shanghai';
 
 const POLARPRIVATE_URL = process.env.POLARPRIVATE_URL || 'http://127.0.0.1:12790';
-const DEFAULT_MODEL = 'qwen3-coder-plus';
+// PolarPrivate expects QCSA capability codes, not vendor model names. 0100 =
+// DS-V4-Pro (long-context 1M) — fits digest domains that can carry 50+ items.
+// Override via DIGIST_SUMMARY_MODEL.
+const DEFAULT_MODEL = process.env.DIGIST_SUMMARY_MODEL || '0100';
 const MAX_RETRIES = 4;
 const RETRY_DELAY_MS = 5000;
 

@@ -43,7 +43,7 @@ let cachedRecommender: any = null;
 let cachedRecommenderAt = 0;
 const DB_PATH = process.env.DIGIST_DB || './data/digist.sqlite';
 
-const noQueryPlatforms = new Set<string>(['glass', 'hackernews', 'bloomberg']);
+const noQueryPlatforms = new Set<string>(['glass', 'hackernews', 'bloomberg', 'v2ex']);
 
 type VideoDigestJob = {
   status: 'pending' | 'running' | 'done' | 'failed';

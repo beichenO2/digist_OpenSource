@@ -13,7 +13,6 @@ interface HNItem {
   time?: number;
   score?: number;
   descendants?: number;
-  kids?: number[];
   type?: string;
 }
 
@@ -22,20 +21,6 @@ async function fetchItem(id: number): Promise<HNItem> {
     const resp = await axios.get(`${HN_API}/item/${id}.json`, { timeout: 10_000 });
     return resp.data;
   });
-}
-
-async function fetchComments(kids: number[], maxComments = 5): Promise<string[]> {
-  const comments: string[] = [];
-  for (const kid of kids.slice(0, maxComments)) {
-    try {
-      const item = await fetchItem(kid);
-      if (item.text) {
-        const clean = item.text.replace(/<[^>]*>/g, '').trim();
-        comments.push(`**${item.by || 'anon'}**: ${clean}`);
-      }
-    } catch { /* skip */ }
-  }
-  return comments;
 }
 
 export const hackerNewsScraper: Scraper = {
@@ -49,30 +34,26 @@ export const hackerNewsScraper: Scraper = {
     const resp = await retryWithBackoff(() => axios.get(`${HN_API}/${endpoint}.json`, { timeout: 10_000 }));
     const storyIds: number[] = resp.data.slice(0, maxItems);
 
-    const items: ContentItem[] = [];
-    for (const id of storyIds) {
-      try {
-        const story = await fetchItem(id);
-        if (!story.title) continue;
+    const stories = (await Promise.all(
+      storyIds.map((id) => fetchItem(id).catch(() => null)),
+    )).filter((story): story is HNItem => story !== null && !!story.title);
 
-        const commentTexts = story.kids ? await fetchComments(story.kids, 3) : [];
-        const bodyParts = [story.url ? `[Link](${story.url})` : '', story.text?.replace(/<[^>]*>/g, '') || ''];
-        if (commentTexts.length > 0) bodyParts.push('\n---\n### Top Comments\n' + commentTexts.join('\n\n'));
+    const items: ContentItem[] = stories.map((story) => {
+      const bodyParts = [story.url ? `[Link](${story.url})` : '', story.text?.replace(/<[^>]*>/g, '') || ''];
 
-        items.push({
-          id: '',
-          title: story.title,
-          body_markdown: bodyParts.filter(Boolean).join('\n\n'),
-          author: story.by || '',
-          timestamp: new Date((story.time || 0) * 1000).toISOString(),
-          source_url: `https://news.ycombinator.com/item?id=${story.id}`,
-          platform: 'hackernews',
-          tags: ['hackernews', endpoint, `score:${story.score || 0}`],
-          raw_metadata: { score: story.score, comments: story.descendants, hn_id: story.id },
-          scraped_at: new Date().toISOString(),
-        });
-      } catch { /* skip */ }
-    }
+      return {
+        id: '',
+        title: story.title!,
+        body_markdown: bodyParts.filter(Boolean).join('\n\n'),
+        author: story.by || '',
+        timestamp: new Date((story.time || 0) * 1000).toISOString(),
+        source_url: `https://news.ycombinator.com/item?id=${story.id}`,
+        platform: 'hackernews',
+        tags: ['hackernews', endpoint, `score:${story.score || 0}`],
+        raw_metadata: { score: story.score, descendants: story.descendants, hn_id: story.id },
+        scraped_at: new Date().toISOString(),
+      };
+    });
 
     return { items, next_cursor: null, has_more: false };
   },

@@ -9,7 +9,7 @@
     "id": { "type": "string", "minLength": 1 },
     "platform": {
       "type": "string",
-      "enum": ["bilibili", "youtube", "arxiv", "hackernews", "reddit", "github", "glass", "other"]
+      "enum": ["bilibili", "youtube", "arxiv", "hackernews", "reddit", "github", "v2ex", "wechat", "glass", "other"]
     },
     "source_type": {
       "type": "string",

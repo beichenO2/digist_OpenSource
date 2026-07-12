@@ -5,7 +5,7 @@
     {
       "id": "digist.crawl",
       "service_name": "digist-api",
-      "description": "触发平台爬取（hackernews, bloomberg, glass 等）",
+      "description": "触发分层采集（L1 免登：arxiv/hackernews/reddit/github/youtube/v2ex/bilibili/wechat；safari 兜底：twitter/xiaohongshu/zhihu/bloomberg）",
       "transport": "http",
       "endpoint": "/api/crawl/trigger",
       "method": "POST",

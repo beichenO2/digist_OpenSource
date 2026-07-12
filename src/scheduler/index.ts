@@ -1,35 +1,15 @@
 import cron from 'node-cron';
 import { Storage } from '../storage/index.js';
-import { redditScraper } from '../scrapers/reddit.js';
-import { glassBridgeScraper } from '../scrapers/glass-bridge.js';
-import { githubScraper } from '../scrapers/github.js';
-import {
-  twitterScraper, xiaohongshuScraper,
-  zhihuScraper, bilibiliScraper, bloombergScraper,
-} from '../scrapers/safari-scraper.js';
-import { wechatRssScraper as wechatScraper } from '../scrapers/wechat-rss.js';
-import { arxivScraper } from '../scrapers/arxiv.js';
-import { hackerNewsScraper as hackernewsScraper } from '../scrapers/hackernews.js';
-import { youtubeScraper } from '../scrapers/youtube.js';
 import { firecrawlSearchScraper, isFirecrawlConfigured } from '../scrapers/firecrawl-scraper.js';
+import { collect } from '../collector/layered-collector.js';
+import { getStrategy } from '../collector/registry.js';
 import { canScrapePlatformNow } from './risk-window-policy.js';
 import { normalizeBatch, deduplicateByUrl } from '../normalizer/index.js';
-import type { Scraper, ScrapeJob } from '../types/index.js';
+import type { ScrapeJob } from '../types/index.js';
 
-const SCRAPERS: Record<string, Scraper> = {
-  twitter: twitterScraper,
-  reddit: redditScraper,
-  wechat: wechatScraper,
-  github: githubScraper,
-  glass: glassBridgeScraper,
-  xiaohongshu: xiaohongshuScraper,
-  zhihu: zhihuScraper,
-  arxiv: arxivScraper,
-  bilibili: bilibiliScraper,
-  hackernews: hackernewsScraper,
-  bloomberg: bloombergScraper,
-  youtube: youtubeScraper,
-};
+// Platforms still served by the Safari fallback scraper (real browser session).
+// bilibili moved to the L1 open-API scraper, so it is no longer listed here.
+const SAFARI_PLATFORMS = new Set(['twitter', 'xiaohongshu', 'zhihu', 'bloomberg']);
 
 export class Scheduler {
   private storage: Storage;
@@ -108,8 +88,7 @@ export class Scheduler {
   }
 
   private async executeJob(job: ScrapeJob): Promise<number> {
-    const scraper = SCRAPERS[job.platform];
-    if (!scraper) {
+    if (!getStrategy(job.platform)) {
       console.error(`[Scheduler] No scraper for platform: ${job.platform}`);
       return 0;
     }
@@ -121,13 +100,13 @@ export class Scheduler {
     }
 
     const cursor = this.storage.getCursor(job.id, 'last_page');
-
-    const SAFARI_PLATFORMS = new Set(['twitter', 'xiaohongshu', 'zhihu', 'bilibili', 'bloomberg']);
     const maxItems = SAFARI_PLATFORMS.has(job.platform) ? 10 : 20;
 
     let result;
     try {
-      result = await scraper.scrape(job.query, { cursor, maxItems });
+      // Route through the LayeredCollector (single source of platform → layer
+      // truth) instead of a duplicate scraper map.
+      result = await collect(job.platform, job.query, { cursor, maxItems });
     } catch (err) {
       console.warn(`[Scheduler] Primary scraper failed for ${job.platform}, trying Firecrawl fallback...`);
       if (isFirecrawlConfigured()) {

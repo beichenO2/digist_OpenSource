@@ -6,12 +6,17 @@ import { githubScraper } from './scrapers/github.js';
 import { normalizeBatch, deduplicateByUrl, calculateInfoDensity } from './normalizer/index.js';
 import {
   twitterScraper, xiaohongshuScraper,
-  zhihuScraper, bilibiliScraper, bloombergScraper,
+  zhihuScraper, bloombergScraper,
 } from './scrapers/safari-scraper.js';
+import { bilibiliScraper } from './scrapers/bilibili.js';
+import { v2exScraper } from './scrapers/v2ex.js';
 import { wechatRssScraper as wechatScraper, wechatRssScraper } from './scrapers/wechat-rss.js';
 import { firecrawlSearchScraper, isFirecrawlConfigured } from './scrapers/firecrawl-scraper.js';
 import { arxivScraper } from './scrapers/arxiv.js';
 import { hackerNewsScraper as hackernewsScraper } from './scrapers/hackernews.js';
+import { youtubeScraper } from './scrapers/youtube.js';
+import { collect } from './collector/layered-collector.js';
+import { getStrategy } from './collector/registry.js';
 import { mkdirSync } from 'fs';
 import { compressBatch } from './digestion/context-compressor.js';
 import { evaluateDensity } from './digestion/density-evaluator.js';
@@ -39,7 +44,7 @@ async function main() {
         const platform = args[1];
         const query = args[2];
         if (!platform) {
-          console.log('Usage: digist scrape <twitter|reddit|wechat|wechat-rss|github|glass|xiaohongshu|zhihu|arxiv|bilibili|hackernews|bloomberg> <query>');
+          console.log('Usage: digist scrape <twitter|reddit|wechat|wechat-rss|github|glass|xiaohongshu|zhihu|arxiv|bilibili|hackernews|bloomberg|youtube|v2ex> <query>');
           break;
         }
 
@@ -56,11 +61,13 @@ async function main() {
           bilibili: bilibiliScraper,
           hackernews: hackernewsScraper,
           bloomberg: bloombergScraper,
+          youtube: youtubeScraper,
+          v2ex: v2exScraper,
         };
 
         const scraper = scrapers[platform];
         if (!scraper) {
-          console.log(`Unknown platform: ${platform}. Use: twitter, reddit, wechat, wechat-rss, github, glass, xiaohongshu, zhihu, arxiv, bilibili, hackernews, bloomberg, youtube`);
+          console.log(`Unknown platform: ${platform}. Use: twitter, reddit, wechat, wechat-rss, github, glass, xiaohongshu, zhihu, arxiv, bilibili, hackernews, bloomberg, youtube, v2ex`);
           break;
         }
 
@@ -77,18 +84,17 @@ async function main() {
           break;
         }
 
-        const SAFARI_PLATFORMS = new Set(['twitter', 'xiaohongshu', 'zhihu', 'bilibili', 'bloomberg']);
-        let activeScraper = scraper;
-        let maxItems = SAFARI_PLATFORMS.has(platform) ? 10 : 20;
-        let scraperLabel = platform;
-
-        if (SAFARI_PLATFORMS.has(platform)) {
-          activeScraper = scraper;
-          scraperLabel = `${platform} (safari)`;
-        }
+        const SAFARI_PLATFORMS = new Set(['twitter', 'xiaohongshu', 'zhihu', 'bloomberg']);
+        const maxItems = SAFARI_PLATFORMS.has(platform) ? 10 : 20;
+        const scraperLabel = SAFARI_PLATFORMS.has(platform) ? `${platform} (safari→L3 fallback)` : platform;
 
         console.log(`Scraping ${scraperLabel}: "${q || '(all recent)' }" (limit=${maxItems})...`);
-        const result = await activeScraper.scrape(q, { maxItems });
+        // Route through the LayeredCollector when the platform is registered
+        // (gives L1→L3 fallback for free). The `wechat-rss` alias isn't in the
+        // collector, so it still uses its direct scraper.
+        const result = getStrategy(platform)
+          ? await collect(platform, q, { maxItems })
+          : await scraper.scrape(q, { maxItems });
         const normalized = normalizeBatch(result.items);
         const unique = deduplicateByUrl(normalized);
         const saved = storage.insertBatch(unique);

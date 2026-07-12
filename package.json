@@ -25,7 +25,9 @@
     "test:edge": "tsx test-edge.ts",
     "test:all": "tsx test-all.ts",
     "test:scrapers": "tsx test-scrapers.ts",
-    "test:perf": "tsx test-perf.ts"
+    "test:perf": "tsx test-perf.ts",
+    "test:l1": "tsx tests/l1-collection.qa.ts",
+    "test:l3": "tsx tests/l3-selfheal.qa.ts"
   },
   "dependencies": {
     "@mendable/firecrawl-js": "^1.21.1",
@@ -48,5 +50,8 @@
     "@types/turndown": "^5.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
+  },
+  "optionalDependencies": {
+    "patchright": "^1.61.1"
   }
 }

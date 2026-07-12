@@ -11,8 +11,12 @@ let _werssBase: string | null = null;
 
 async function resolveWerssBase(): Promise<string> {
   if (_werssBase) return _werssBase;
-  if (process.env.WERSS_URL?.trim()) {
-    _werssBase = process.env.WERSS_URL.trim();
+  // Prefer wewe-rss (WEWE_RSS_URL) if configured, else legacy WeRSS (WERSS_URL).
+  // Both expose standard RSS XML consumable by parseRssXml; for wewe-rss whose
+  // feed listing path differs, pass a full feed URL as the scrape query.
+  const explicit = process.env.WEWE_RSS_URL?.trim() || process.env.WERSS_URL?.trim();
+  if (explicit) {
+    _werssBase = explicit;
     return _werssBase;
   }
   try {
@@ -27,7 +31,7 @@ async function resolveWerssBase(): Promise<string> {
       return _werssBase;
     }
   } catch { /* port-sdk not available */ }
-  throw new Error('[WeChat-RSS] Unable to resolve WeRSS endpoint via Port SDK. Please register/start "werss" in SOTAgent or set WERSS_URL.');
+  throw new Error('[WeChat-RSS] Unable to resolve feed endpoint. Set WEWE_RSS_URL (wewe-rss) or WERSS_URL (legacy WeRSS), or register/start "werss" in SOTAgent.');
 }
 
 export const wechatRssScraper: Scraper = {

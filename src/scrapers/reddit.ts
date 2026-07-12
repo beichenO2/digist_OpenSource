@@ -55,28 +55,41 @@ export const redditScraper: Scraper = {
       ? `https://www.reddit.com/${query.replace(/^\/?/, '')}.rss`
       : `https://www.reddit.com/search.rss?q=${encodeURIComponent(query)}&sort=relevance&t=week&limit=${maxItems}`;
 
-    const resp = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; research feed reader)' },
-    });
+    // Bounded request: an unreachable Reddit (network-blocked env) must fail
+    // fast instead of hanging the whole digest. Failures return empty items —
+    // consistent with the other L1 scrapers — so one dead platform never
+    // aborts a multi-platform crawl.
+    try {
+      const resp = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; research feed reader)' },
+        signal: AbortSignal.timeout(15_000),
+      });
 
-    if (!resp.ok) throw new Error(`Reddit RSS ${resp.status}: ${resp.statusText}`);
+      if (!resp.ok) {
+        console.error(`[Reddit] RSS ${resp.status}: ${resp.statusText} (${url})`);
+        return { items: [], next_cursor: null, has_more: false };
+      }
 
-    const xml = await resp.text();
-    const entries = parseAtomXml(xml).slice(0, maxItems);
+      const xml = await resp.text();
+      const entries = parseAtomXml(xml).slice(0, maxItems);
 
-    const items: ContentItem[] = entries.map((e) => ({
-      id: '',
-      title: e.title,
-      body_markdown: e.content || e.title,
-      author: e.author || '[unknown]',
-      timestamp: e.published || new Date().toISOString(),
-      source_url: e.link,
-      platform: 'reddit' as const,
-      tags: [e.subreddit].filter(Boolean),
-      raw_metadata: { subreddit: e.subreddit },
-      scraped_at: new Date().toISOString(),
-    }));
+      const items: ContentItem[] = entries.map((e) => ({
+        id: '',
+        title: e.title,
+        body_markdown: e.content || e.title,
+        author: e.author || '[unknown]',
+        timestamp: e.published || new Date().toISOString(),
+        source_url: e.link,
+        platform: 'reddit' as const,
+        tags: [e.subreddit].filter(Boolean),
+        raw_metadata: { subreddit: e.subreddit },
+        scraped_at: new Date().toISOString(),
+      }));
 
-    return { items, next_cursor: null, has_more: false };
+      return { items, next_cursor: null, has_more: false };
+    } catch (err) {
+      console.error('[Reddit] RSS fetch error:', err instanceof Error ? err.message : err);
+      return { items: [], next_cursor: null, has_more: false };
+    }
   },
 };

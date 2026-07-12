@@ -7,18 +7,21 @@ import { glassBridgeScraper } from '../scrapers/glass-bridge.js';
 import { redditScraper } from '../scrapers/reddit.js';
 import {
   twitterScraper, xiaohongshuScraper,
-  zhihuScraper, bilibiliScraper, bloombergScraper,
+  zhihuScraper, bloombergScraper,
 } from '../scrapers/safari-scraper.js';
+import { bilibiliScraper } from '../scrapers/bilibili.js';
+import { v2exScraper } from '../scrapers/v2ex.js';
 import { wechatRssScraper as wechatScraper } from '../scrapers/wechat-rss.js';
 import { arxivScraper } from '../scrapers/arxiv.js';
 import { hackerNewsScraper as hackernewsScraper } from '../scrapers/hackernews.js';
 import { youtubeScraper } from '../scrapers/youtube.js';
+import { collect } from '../collector/layered-collector.js';
 import { canScrapePlatformNow } from '../scheduler/risk-window-policy.js';
 import type { Scraper, ScraperOptions, ScraperResult } from '../types/index.js';
 
 export const crawlPlatforms = [
   'twitter', 'reddit', 'wechat', 'github', 'glass',
-  'xiaohongshu', 'zhihu', 'arxiv', 'bilibili', 'hackernews', 'bloomberg', 'youtube',
+  'xiaohongshu', 'zhihu', 'arxiv', 'bilibili', 'hackernews', 'bloomberg', 'youtube', 'v2ex',
 ] as const;
 
 export type CrawlPlatform = (typeof crawlPlatforms)[number];
@@ -36,6 +39,7 @@ const scrapers: Record<CrawlPlatform, Scraper> = {
   hackernews: hackernewsScraper,
   bloomberg: bloombergScraper,
   youtube: youtubeScraper,
+  v2ex: v2exScraper,
 };
 
 export function getCrawlScraper(platform: string): Scraper | undefined {
@@ -56,11 +60,12 @@ export async function crawl(
     throw new Error(policy.reason ?? `${platform} is temporarily disabled`);
   }
 
-  const s = scrapers[platform];
-  if (!s) {
-    throw new Error(`Unknown platform: ${platform}. Expected one of: ${crawlPlatforms.join(', ')}`);
-  }
-  return s.scrape(query, options);
+  const result = await collect(platform, query, options);
+  return {
+    items: result.items,
+    next_cursor: result.next_cursor,
+    has_more: result.has_more,
+  };
 }
 
 export type { ScraperOptions, ScraperResult, Scraper } from '../types/index.js';

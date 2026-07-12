@@ -208,7 +208,7 @@ ${candidates.join('\n\n')}`;
 
   try {
     const resp = await generateText(prompt, {
-      capability: 'xopdeepseekv4pro',
+      capability: '0100',
       maxTokens: 800,
       temperature: 0.3,
       system: '你是一个严格的信息筛选器。只输出 JSON 数组，不输出其他任何文字。用简洁的中文概括核心洞察，重点是"是什么/怎么做/结果如何"，避免描述性叙事。',
@@ -270,7 +270,7 @@ ${richItems.join('\n')}`;
 
   try {
     const resp = await generateText(prompt, {
-      capability: 'xopdeepseekv4pro',
+      capability: '0100',
       maxTokens: 600,
       temperature: 0.4,
       system: '你是一个信息分析师，擅长从大量信息中提取有意义的趋势和深层原因。输出简洁的中文分析，不用感叹号，不用「值得关注」「引人深思」等AI修饰语。',

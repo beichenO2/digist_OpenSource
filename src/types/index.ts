@@ -5,7 +5,7 @@ export interface ContentItem {
   author: string;
   timestamp: string;
   source_url: string;
-  platform: 'twitter' | 'reddit' | 'wechat' | 'github' | 'glass' | 'xiaohongshu' | 'zhihu' | 'arxiv' | 'bilibili' | 'hackernews' | 'bloomberg' | 'youtube' | 'other';
+  platform: 'twitter' | 'reddit' | 'wechat' | 'github' | 'glass' | 'xiaohongshu' | 'zhihu' | 'arxiv' | 'bilibili' | 'hackernews' | 'bloomberg' | 'youtube' | 'v2ex' | 'other';
   tags: string[];
   raw_metadata: Record<string, unknown>;
   scraped_at: string;
