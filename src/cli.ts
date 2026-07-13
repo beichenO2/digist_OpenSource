@@ -4,10 +4,6 @@ import { redditScraper } from './scrapers/reddit.js';
 import { glassBridgeScraper } from './scrapers/glass-bridge.js';
 import { githubScraper } from './scrapers/github.js';
 import { normalizeBatch, deduplicateByUrl, calculateInfoDensity } from './normalizer/index.js';
-import {
-  twitterScraper, xiaohongshuScraper,
-  zhihuScraper, bloombergScraper,
-} from './scrapers/safari-scraper.js';
 import { bilibiliScraper } from './scrapers/bilibili.js';
 import { v2exScraper } from './scrapers/v2ex.js';
 import { wechatRssScraper as wechatScraper, wechatRssScraper } from './scrapers/wechat-rss.js';
@@ -44,34 +40,23 @@ async function main() {
         const platform = args[1];
         const query = args[2];
         if (!platform) {
-          console.log('Usage: digist scrape <twitter|reddit|wechat|wechat-rss|github|glass|xiaohongshu|zhihu|arxiv|bilibili|hackernews|bloomberg|youtube|v2ex> <query>');
+          console.log('Usage: digist scrape <reddit|wechat|wechat-rss|github|glass|zhihu|arxiv|bilibili|hackernews|bloomberg|youtube|v2ex> <query>');
           break;
         }
 
-        const scrapers: Record<string, typeof redditScraper> = {
-          twitter: twitterScraper,
-          reddit: redditScraper,
-          wechat: wechatScraper,
+        // Direct-scraper map for the `wechat-rss` alias only. All other
+        // platforms route through the LayeredCollector (getStrategy/collect).
+        const directScrapers: Record<string, typeof redditScraper> = {
           'wechat-rss': wechatRssScraper,
-          github: githubScraper,
-          glass: glassBridgeScraper,
-          xiaohongshu: xiaohongshuScraper,
-          zhihu: zhihuScraper,
-          arxiv: arxivScraper,
-          bilibili: bilibiliScraper,
-          hackernews: hackernewsScraper,
-          bloomberg: bloombergScraper,
-          youtube: youtubeScraper,
-          v2ex: v2exScraper,
         };
 
-        const scraper = scrapers[platform];
-        if (!scraper) {
-          console.log(`Unknown platform: ${platform}. Use: twitter, reddit, wechat, wechat-rss, github, glass, xiaohongshu, zhihu, arxiv, bilibili, hackernews, bloomberg, youtube, v2ex`);
+        const scraper = directScrapers[platform];
+        if (!scraper && !getStrategy(platform)) {
+          console.log(`Unknown platform: ${platform}. Use: reddit, wechat, wechat-rss, github, glass, zhihu, arxiv, bilibili, hackernews, bloomberg, youtube, v2ex`);
           break;
         }
 
-        const noQueryPlatforms = ['glass', 'hackernews', 'bloomberg'];
+        const noQueryPlatforms = ['glass', 'hackernews', 'bloomberg', 'v2ex'];
         const q = noQueryPlatforms.includes(platform) ? (query ?? '') : query!;
         if (!noQueryPlatforms.includes(platform) && !query) {
           console.log('Usage: digist scrape <platform> <query>');
@@ -84,9 +69,10 @@ async function main() {
           break;
         }
 
-        const SAFARI_PLATFORMS = new Set(['twitter', 'xiaohongshu', 'zhihu', 'bloomberg']);
-        const maxItems = SAFARI_PLATFORMS.has(platform) ? 10 : 20;
-        const scraperLabel = SAFARI_PLATFORMS.has(platform) ? `${platform} (safari→L3 fallback)` : platform;
+        // L3 browser platforms get a smaller cap (only zhihu now; bloomberg→RSS).
+        const HEAVY_PLATFORMS = new Set(['zhihu']);
+        const maxItems = HEAVY_PLATFORMS.has(platform) ? 10 : 20;
+        const scraperLabel = HEAVY_PLATFORMS.has(platform) ? `${platform} (L3 browser)` : platform;
 
         console.log(`Scraping ${scraperLabel}: "${q || '(all recent)' }" (limit=${maxItems})...`);
         // Route through the LayeredCollector when the platform is registered
@@ -94,7 +80,7 @@ async function main() {
         // collector, so it still uses its direct scraper.
         const result = getStrategy(platform)
           ? await collect(platform, q, { maxItems })
-          : await scraper.scrape(q, { maxItems });
+          : await scraper!.scrape(q, { maxItems });
         const normalized = normalizeBatch(result.items);
         const unique = deduplicateByUrl(normalized);
         const saved = storage.insertBatch(unique);
@@ -196,7 +182,7 @@ async function main() {
         console.log(`  Total content items: ${storage.contentCount()}`);
         const jobs = storage.listJobs();
         console.log(`  Scheduled jobs: ${jobs.length} (${jobs.filter(j => j.enabled).length} active)`);
-        for (const platform of ['twitter', 'reddit', 'wechat', 'github', 'glass', 'xiaohongshu', 'zhihu', 'arxiv', 'bilibili', 'hackernews', 'bloomberg'] as const) {
+        for (const platform of ['reddit', 'wechat', 'github', 'glass', 'zhihu', 'arxiv', 'bilibili', 'hackernews', 'bloomberg', 'youtube', 'v2ex'] as const) {
           const items = storage.listContent(platform, 1);
           const count = storage.listContent(platform, 10000).length;
           console.log(`  ${platform}: ${count} items`);

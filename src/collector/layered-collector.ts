@@ -21,7 +21,7 @@ export async function collect(
       const fallbackResult = await strategy.fallback.handle(query, options);
       return {
         items: fallbackResult.items,
-        layer: 'L3',
+        layer: strategy.fallback.layer,
         degraded: true,
         next_cursor: fallbackResult.next_cursor,
         has_more: fallbackResult.has_more,
@@ -30,7 +30,7 @@ export async function collect(
 
     return {
       items: result.items,
-      layer: 'L1',
+      layer: strategy.primary.layer,
       degraded: false,
       next_cursor: result.next_cursor,
       has_more: result.has_more,
@@ -40,7 +40,7 @@ export async function collect(
       const fallbackResult = await strategy.fallback.handle(query, options);
       return {
         items: fallbackResult.items,
-        layer: 'L3',
+        layer: strategy.fallback.layer,
         degraded: true,
         next_cursor: fallbackResult.next_cursor,
         has_more: fallbackResult.has_more,

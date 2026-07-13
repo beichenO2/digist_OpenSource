@@ -92,7 +92,11 @@ async function main(): Promise<void> {
     const strat = getStrategy(p);
     ok(!!strat && strat.primary.layer === 'L1', `${p} 策略 primary 层级 = L1`);
   }
-  ok(Object.keys(l1Strategies).length >= 13, `注册平台数 ≥ 13（实际 ${Object.keys(l1Strategies).length}）`);
+  // twitter/xiaohongshu removed (强风控停爬); expect the 11 remaining platforms.
+  ok(Object.keys(l1Strategies).length >= 11, `注册平台数 ≥ 11（实际 ${Object.keys(l1Strategies).length}）`);
+  ok(getStrategy('twitter') === undefined && getStrategy('xiaohongshu') === undefined, 'twitter/xiaohongshu 已彻底移除');
+  ok(getStrategy('bloomberg')?.primary.layer === 'L1', 'bloomberg 为 L1（CNBC RSS 免登，非浏览器）');
+  ok(getStrategy('zhihu')?.primary.layer === 'L3', 'zhihu 为 L3 primary（反检测浏览器，无 Safari）');
 
   // ── 阶段 2：未知平台错误契约 ──
   console.log('\n【阶段 2】错误契约');

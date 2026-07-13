@@ -3,9 +3,10 @@
 // Re-enable per-platform if any platform starts rate-limiting.
 const RISK_WINDOW_PLATFORMS = new Set<string>([]);
 
-// Platforms temporarily disabled (e.g. account suspended, no viable access).
-// Override via DIGIST_DISABLED_PLATFORMS (comma-separated); set to "" to enable all.
-const DEFAULT_DISABLED_PLATFORMS = ['twitter'];
+// Platforms disabled by default. twitter/xiaohongshu were removed entirely
+// (强风控高封号风险，停止采集); this list is a safety net if any stale job
+// still references them. Override via DIGIST_DISABLED_PLATFORMS (comma-separated).
+const DEFAULT_DISABLED_PLATFORMS = ['twitter', 'xiaohongshu'];
 
 function getDisabledPlatforms(): Set<string> {
   const env = process.env.DIGIST_DISABLED_PLATFORMS;

@@ -185,7 +185,7 @@ interface PlatformStrategy {
 | **P0** | 运行时修复（端口漂移+僵尸+自启）| 3800 健康 + Clock 端到端 200 | ✅ 已完成 |
 | **P1** | 搭 LayeredCollector 骨架 + L1 免登层全平台，统一 crawl-api/CLI/scheduler 路由 | typecheck + 5 套测试 + L1 全流程 QA + 实时 API 端到端 | ✅ 已完成（见 §13） |
 | **P2** | L3 Agentic 兜底（patchright 独立 profile）+ LLM selector 自愈回写 | 故意破坏 selector，验证 LLM 自愈成功并回写 + 完整 daily-digest.sh 端到端 | ✅ 已完成（见 §14） |
-| **P3** | 下线 safari-scraper，清理串行调度改并行 | 单轮 digest 从 40–90min 降到分钟级 | 待 P2 后 |
+| **P3** | bloomberg/zhihu 改 L3 为主（去 Safari）+ 串行调度改并行 | 单轮 digest 106s（旧串行 40–90min）+ 全量回归 | ✅ 已完成（见 §15） |
 
 > L2 登录态层（原计划）已移除，见附录 A。
 > **L3 浏览器选型修正**：设计原推荐 Camoufox，实现时改用 **patchright**——2026 年 Camoufox 虽有 `camoufox-js`（无需 Python）但仍需单独 fetch ~280MB Firefox 二进制、标 Experimental；patchright 是纯 Node 的 Playwright drop-in（Chromium 补丁），可复用本机已有 Chromium，工程可行性/CI 友好度更高，抗指纹也够用。Camoufox 保留为「Chromium 仍被拦时」的 L3-FF 升级项。
@@ -280,7 +280,7 @@ interface PlatformStrategy {
   - `index.ts`：`createL3Handler`——「持久化 selector → seed → LLM 自愈」三级尝试，全程降级安全（patchright/LLM 不可用返回空不抛）。
 - **接入**：`registry.ts` 给 bloomberg/zhihu 填 `fallback`（L1 空/异常 → L3）；CLI scrape 也路由 collect 享受兜底。
 - **依赖**：`patchright` 作 optionalDependency 加入 package.json。
-- **修复真实缺陷**：daily-report.ts / summarize-daily.ts 用了 PolarPrivate 不认的模型名 `xopdeepseekv4pro`/`qwen3-coder-plus` → 全 digest 摘要 422 失败。改为合法 QCSA 码 `0100`（DS-V4-Pro 长上下文）。**这是本轮 daily-digest 端到端跑出来的隐藏 bug。**
+- **修复真实缺陷**：daily-report.ts / summarize-daily.ts 用了 PolarPrivate 不认的模型名 `xopdeepseekv4pro`/`qwen3-coder-plus` → 全 digest 摘要 422 失败。改为合法 QCSA 码（最终统一为 **`0000` = GLM-5.2，跨 xfyun + glm2 两条线负载均衡 50/50**；`DIGIST_SUMMARY_MODEL` 可覆盖）。**这是本轮 daily-digest 端到端跑出来的隐藏 bug。** 相关 PolarPrivate 侧改动（QCSA 0000/1000→GLM-5.2、新增 glm2 128K 线、双线 LB）在 PolarPrivate 仓。
 - **新增 QA** `tests/l3-selfheal.qa.ts`（`npm run test:l3`）。
 
 ### 14.2 验证结果（证据等级：自动化 + 人工 E2E）
@@ -298,6 +298,64 @@ interface PlatformStrategy {
 - **twitter/xiaohongshu/bloomberg/zhihu 的 Safari primary**：需 macOS Safari 登录态 + GUI，无人值守/CI 环境下 L1 会空 → 触发 L3 patchright 兜底（免登抓公开页）。daily-digest 端到端测试时按 `DIGIST_DISABLED_PLATFORMS` 禁用了这几个 Safari 平台以避免劫持 GUI。
 - L3 首次对某平台自愈会调一次 LLM（数秒）；成功后 selector 持久化，后续走 cheerio 快路径。
 - patchright 复用了本机 ms-playwright 的 chromium；纯净环境需 `npx patchright install chromium`。
+
+## 15. P3 实施与验证结论（2026-07-13 实测）
+
+### 15.1 交付内容
+- **bloomberg / zhihu 去 Safari**：从「Safari primary + L3 fallback」改为 **L3 primary**（patchright 反检测浏览器 + LLM selector 自愈，无 Safari 依赖）。新增 `l3PrimaryStrategy()`（`src/collector/registry.ts`）。
+- **twitter / xiaohongshu 彻底移除采集**（用户指令：强风控高封号风险，停止爬取）：从 `crawlPlatforms`、registry、CLI、smart-scheduler、daily-digest 全部删除；**`safari-scraper.ts` 文件已删除**；risk-window 默认禁用列表补 xiaohongshu 作安全网。
+- **layer 标签修正**：`layered-collector.ts` 成功时改为读 `strategy.primary.layer`（原硬编码 'L1'），L3-primary 平台现正确标 L3。
+- **safari-scraper 保留可回滚**：`safari-scraper.ts` 文件不删（twitter/xiaohongshu 仍用），只是 registry 不再把它作 bloomberg/zhihu 的 primary。
+- **daily-digest.sh 并行化**：
+  - Phase 1（L1 免登平台，互无风控关联）→ **并发**（`DIGIST_L1_CONCURRENCY` 默认 4），去掉逐平台 5 分钟串行 sleep。
+  - Phase 2（bloomberg/zhihu=L3、xiaohongshu=Safari）→ **串行**（L3 profile / Safari 会话不可并发）。
+  - LLM 摘要（summarize/curateTopic）保持串行（防打爆 PolarPrivate）。
+- **CLI/scheduler**：`SAFARI_PLATFORMS` → `HEAVY_PLATFORMS`（仅调小 maxItems，语义更准）。
+
+### 15.2 验证结果
+| 验证项 | 结果 |
+|---|---|
+| `tsc --noEmit` | ✅ 0 错误 |
+| 全量回归 test-edge/all/scrapers | ✅ 45 / 45 / 18 |
+| contract / L3-QA / L1-QA | ✅ 22/0 · 12/0 · 56/0 |
+| bloomberg/zhihu primary 层级 | ✅ 均为 L3（fallback=none） |
+| bloomberg L3 真实采集 | ✅ patchright 打开成功（返回反爬提示页，机制通；生产可加 seed 优化） |
+| **完整 daily-digest.sh（并行）** | ✅ 端到端 **90–210s**（多次采样区间），旧串行版本约 40–90 分钟。分解：Phase1 L1 并发采集 ~20–60s、Phase2 L3 串行(bloomberg+zhihu) ~15–70s、Phase3 摘要 ~55–80s |
+| 单次 LLM 调用真实耗时 | ✅ 小请求 3–5s、日报规模(50 条/4000 token) ~25s（**确认真实调用上游，usage token 有回显**，非伪造/缓存） |
+| daily-digest summarize | ✅ 0 个 422/报错（P2 修的模型码持续生效）；已改为域级并发（`DIGIST_SUMMARY_CONCURRENCY` 默认 2）进一步压缩 Phase3 |
+| digist 3800 / Clock 反代 / PolarPrivate 12790 | ✅ 全 200 |
+
+> 说明：早期报告写的「106s」是单次采样，实测区间是 90–210s（波动主要来自 zhihu L3 自愈耗时与 LLM 负载）；已如实修正，并非固定值。
+
+### 15.3 已知边界
+- bloomberg 首页对数据中心/自动化 IP 有反爬（返回 "unusual activity" 页），L3 机制本身正常；生产环境可换更稳的免登源或补 seed。
+- zhihu 游客态无登录时内容有限，L3 采到 0 条属正常降级（不报错）。
+- daily-digest 106s 中约 70s 是 LLM 摘要（6 域，串行防打爆），采集部分已从分钟级降到 ~35s。
+
+## 16. 生产化：cron 定时 + bloomberg 换源（2026-07-13）
+
+### 16.1 bloomberg → CNBC 官方 RSS（免登、零反爬）
+bloomberg.com 及 RSSHub 公共实例的 bloomberg 路由都有强反爬（实测 rsshub.app/bloomberg/* HTTP 000），不适合无人值守。改为：
+- 新增通用 RSS 采集器 `src/scrapers/rss-feed.ts`（`createRssFeedScraper`，解析 RSS 2.0 / Atom）。
+- **bloomberg slot 改走 CNBC 官方 RSS**（top-news 100003114 + tech 19854910 + economy 20910258 + finance 10000664，各 30 条/feed，HTTP 200 稳定；初版曾误用重复 id，2026-07-13 修正为 4 路不重复 feed），`BLOOMBERG_RSS_URL` 可覆盖 feed。
+- registry 中 bloomberg 从 L3 改为 **L1**（免登）；从 L3_REGISTRATIONS 移除（仅 zhihu 保留 L3）。
+- daily-digest 中 bloomberg 从 Phase 2 移到 **Phase 1 并发**。
+- 实测：`collect('bloomberg')` → L1，6 条真实 CNBC 条目，2.3s，无反爬。platform 仍标 `bloomberg`（digest slot 连续性），raw_metadata.source='cnbc' 如实标注真实来源。
+
+### 16.2 daily-digest 排入 cron（生产化）
+- 权威调度器 = **PolarProcess**（11055），SOTAgent（4800）bridge 转发、可见。
+- `digist-daily-digest` 已注册并幂等确认：command `bash scripts/daily-digest.sh`、work_dir `~/Polarisor/digist`、cron **`0 6,8,11,14,17,20,23 * * *`**（每天 7 次）。PolarProcess cron 循环每分钟检查、按 cron_schedule 触发（不依赖 auto_start）。
+- **裸环境可跑性已验证**：模拟 cron 的 `/bin/sh -c`、`env -i`（无 nvm PATH）跑完整 daily-digest → 退出 0、9 平台全 ✓、summarize 0 报错。关键：digist 有 `.nvmrc=22`，`ensure-node.sh` 在裸环境也能定位 node v22（解决 better-sqlite3 ABI）。
+- **清理冗余**：`digist-summarize` 独立 cron 被禁用（cron 置 null）——它与 daily-digest 的 Phase 3 摘要重复，且其 command 指向失效的 node v20 路径会崩。
+
+### 16.3 验证
+| 项 | 结果 |
+|---|---|
+| bloomberg L1(CNBC RSS) 采集 | ✅ 6 条真实条目 / 2.3s / 无反爬 |
+| 裸环境 cron 模拟完整 digest | ✅ 退出 0、9 平台 ✓、0 报错 |
+| PolarProcess `digist-daily-digest` cron | ✅ `0 6,8,11,14,17,20,23 * * *` 已注册 |
+| SOTAgent bridge 可见 | ✅ True |
+| digist-summarize 冗余 cron | ✅ 已禁用 |
 
 ## 附：证据来源
 - 代码事实：`digist/src/scrapers/*`、`src/api/*`、`src/storage/index.ts`、`contracts/*`、`polaris.json`、`Start/start.sh`、`Clock/backend/main.py`、`Clock/frontend/vite.config.ts`、`PolarPort/src/{registry,known-services,server}.ts`（本仓真实读取）

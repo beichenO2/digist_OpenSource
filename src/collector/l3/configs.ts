@@ -14,14 +14,7 @@ export interface L3Registration {
 }
 
 export const L3_REGISTRATIONS: Record<string, L3Registration> = {
-  bloomberg: {
-    config: {
-      platform: 'bloomberg',
-      buildUrl: () => 'https://www.bloomberg.com/technology',
-      itemDescription: 'Bloomberg 科技新闻的文章标题条目（每条含标题和链接）',
-    },
-    seed: { item: 'article, [data-component=headline]', title: 'h3, h2, .headline', link: 'a', source: 'manual' },
-  },
+  // bloomberg 已改走 CNBC 官方 RSS（L1 免登），不再用 L3 浏览器爬 bloomberg.com。
   zhihu: {
     config: {
       platform: 'zhihu',

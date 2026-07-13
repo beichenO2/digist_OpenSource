@@ -7,9 +7,10 @@ import { canScrapePlatformNow } from './risk-window-policy.js';
 import { normalizeBatch, deduplicateByUrl } from '../normalizer/index.js';
 import type { ScrapeJob } from '../types/index.js';
 
-// Platforms still served by the Safari fallback scraper (real browser session).
-// bilibili moved to the L1 open-API scraper, so it is no longer listed here.
-const SAFARI_PLATFORMS = new Set(['twitter', 'xiaohongshu', 'zhihu', 'bloomberg']);
+// Heavy platform gets a smaller per-run cap. Only zhihu uses the L3 anti-detect
+// browser now; bloomberg moved to CNBC RSS (L1), bilibili to L1 open API,
+// twitter/xiaohongshu removed.
+const HEAVY_PLATFORMS = new Set(['zhihu']);
 
 export class Scheduler {
   private storage: Storage;
@@ -100,7 +101,7 @@ export class Scheduler {
     }
 
     const cursor = this.storage.getCursor(job.id, 'last_page');
-    const maxItems = SAFARI_PLATFORMS.has(job.platform) ? 10 : 20;
+    const maxItems = HEAVY_PLATFORMS.has(job.platform) ? 10 : 20;
 
     let result;
     try {

@@ -2,53 +2,24 @@
  * Stable programmatic crawl API for dependents (`digest.crawl_api` capability).
  * Mirrors CLI `digist scrape` platform wiring without touching storage.
  */
-import { githubScraper } from '../scrapers/github.js';
-import { glassBridgeScraper } from '../scrapers/glass-bridge.js';
-import { redditScraper } from '../scrapers/reddit.js';
-import {
-  twitterScraper, xiaohongshuScraper,
-  zhihuScraper, bloombergScraper,
-} from '../scrapers/safari-scraper.js';
-import { bilibiliScraper } from '../scrapers/bilibili.js';
-import { v2exScraper } from '../scrapers/v2ex.js';
-import { wechatRssScraper as wechatScraper } from '../scrapers/wechat-rss.js';
-import { arxivScraper } from '../scrapers/arxiv.js';
-import { hackerNewsScraper as hackernewsScraper } from '../scrapers/hackernews.js';
-import { youtubeScraper } from '../scrapers/youtube.js';
 import { collect } from '../collector/layered-collector.js';
+import { getStrategy } from '../collector/registry.js';
 import { canScrapePlatformNow } from '../scheduler/risk-window-policy.js';
-import type { Scraper, ScraperOptions, ScraperResult } from '../types/index.js';
+import type { ScraperOptions, ScraperResult } from '../types/index.js';
 
+// twitter/xiaohongshu removed — 强风控高封号风险，已停止采集（用户指令）。
+// bloomberg/zhihu now served by L3 (no Safari); the rest are L1 免登.
 export const crawlPlatforms = [
-  'twitter', 'reddit', 'wechat', 'github', 'glass',
-  'xiaohongshu', 'zhihu', 'arxiv', 'bilibili', 'hackernews', 'bloomberg', 'youtube', 'v2ex',
+  'reddit', 'wechat', 'github', 'glass',
+  'zhihu', 'arxiv', 'bilibili', 'hackernews', 'bloomberg', 'youtube', 'v2ex',
 ] as const;
 
 export type CrawlPlatform = (typeof crawlPlatforms)[number];
 
-const scrapers: Record<CrawlPlatform, Scraper> = {
-  twitter: twitterScraper,
-  reddit: redditScraper,
-  wechat: wechatScraper,
-  github: githubScraper,
-  glass: glassBridgeScraper,
-  xiaohongshu: xiaohongshuScraper,
-  zhihu: zhihuScraper,
-  arxiv: arxivScraper,
-  bilibili: bilibiliScraper,
-  hackernews: hackernewsScraper,
-  bloomberg: bloombergScraper,
-  youtube: youtubeScraper,
-  v2ex: v2exScraper,
-};
-
-export function getCrawlScraper(platform: string): Scraper | undefined {
-  return scrapers[platform as CrawlPlatform];
-}
-
 /**
  * Run a single scrape for the given platform (same contract as CLI `scrape`).
  * For `glass`, `query` may be empty string to pull recent bridge data.
+ * Routes through the LayeredCollector (L1 primary → L3 fallback where configured).
  */
 export async function crawl(
   platform: CrawlPlatform,
@@ -66,6 +37,11 @@ export async function crawl(
     next_cursor: result.next_cursor,
     has_more: result.has_more,
   };
+}
+
+/** True if the platform is registered in the collector (used for validation). */
+export function isCrawlPlatform(platform: string): boolean {
+  return getStrategy(platform) !== undefined;
 }
 
 export type { ScraperOptions, ScraperResult, Scraper } from '../types/index.js';

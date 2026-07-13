@@ -22,15 +22,14 @@ interface PlatformPolicy {
 }
 
 const POLICIES: Record<string, PlatformPolicy> = {
-  twitter:      { intervalMin: 90 },
   hackernews:   { intervalMin: 90 },
   youtube:      { intervalMin: 120 },
   reddit:       { intervalMin: 120 },
   arxiv:        { intervalMin: 120 },
   bilibili:     { intervalMin: 120 },
-  xiaohongshu:  { intervalMin: 120 },
-  zhihu:        { intervalMin: 120 },
-  bloomberg:    { intervalMin: 180 },
+  v2ex:         { intervalMin: 120 },
+  zhihu:        { intervalMin: 180 },   // L3 browser
+  bloomberg:    { intervalMin: 180 },   // L3 browser
   github:       { intervalMin: 180 },
   wechat:       { intervalMin: 180 },
   glass:        { intervalMin: 15 },

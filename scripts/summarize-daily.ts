@@ -16,10 +16,9 @@ const DB_PATH = process.env.DIGIST_DB || './data/digist.sqlite';
 const DIGIST_TIME_ZONE = process.env.DIGIST_TIME_ZONE || 'Asia/Shanghai';
 
 const POLARPRIVATE_URL = process.env.POLARPRIVATE_URL || 'http://127.0.0.1:12790';
-// PolarPrivate expects QCSA capability codes, not vendor model names. 0100 =
-// DS-V4-Pro (long-context 1M) — fits digest domains that can carry 50+ items.
-// Override via DIGIST_SUMMARY_MODEL.
-const DEFAULT_MODEL = process.env.DIGIST_SUMMARY_MODEL || '0100';
+// 日报走 0000：GLM-5.2，跨 xfyun + glm2 两条线负载均衡 50/50（MiniMax overflow）。
+// 覆盖：DIGIST_SUMMARY_MODEL=glm2 可强制单走 glm2 线（128K），或 0100 走 DS-V4-Pro。
+const DEFAULT_MODEL = process.env.DIGIST_SUMMARY_MODEL || '0000';
 const MAX_RETRIES = 4;
 const RETRY_DELAY_MS = 5000;
 
@@ -249,23 +248,28 @@ async function main() {
   sections.push(`> 采集时间: ${new Date().toISOString()}`);
   sections.push(`> 总计: ${todayItems.length} 条信息\n`);
 
-  for (const [domain, items] of Object.entries(grouped)) {
+  // Summarize domains with bounded concurrency (default 2). Domain summaries are
+  // independent LLM calls; running a couple in parallel roughly halves Phase 3
+  // without overloading PolarPrivate. Output order is preserved by index.
+  const domainEntries = Object.entries(grouped);
+  const SUMMARY_CONCURRENCY = Math.max(1, Number(process.env.DIGIST_SUMMARY_CONCURRENCY || '4'));
+  const domainSections: string[] = new Array(domainEntries.length).fill('');
+
+  async function summarizeDomain(idx: number, domain: string, items: typeof todayItems): Promise<void> {
     const domainName = DOMAIN_NAMES[domain] || domain;
-    sections.push(`\n## ${domainName}\n`);
+    const parts: string[] = [`\n## ${domainName}\n`];
 
     if (!ppOk) {
-      // Fallback: list top items without LLM summary
-      const topItems = items.slice(0, 10);
-      for (const item of topItems) {
+      for (const item of items.slice(0, 10)) {
         const src = item.source_url ? ` — [来源](${item.source_url})` : '';
-        sections.push(`- **${item.title}**${src}`);
+        parts.push(`- **${item.title}**${src}`);
       }
-      sections.push(`\n*（共 ${items.length} 条，PolarPrivate 不可用，仅列出标题）*`);
-      continue;
+      parts.push(`\n*（共 ${items.length} 条，PolarPrivate 不可用，仅列出标题）*`);
+      domainSections[idx] = parts.join('\n');
+      return;
     }
 
     console.log(`Summarizing ${domainName} (${items.length} items)...`);
-
     const itemTexts = items.slice(0, 30).map((item, i) =>
       `[${i + 1}] ${item.title}\n${item.body_markdown?.slice(0, 300) || ''}\n来源: ${item.source_url || item.platform}`
     ).join('\n\n');
@@ -275,17 +279,21 @@ async function main() {
         `以下是今天关于「${domainName}」领域的 ${items.length} 条信息（展示前 ${Math.min(items.length, 30)} 条）:\n\n${itemTexts}\n\n请总结以上信息的关键要点。`,
         systemPrompt,
       );
-      sections.push(summary);
-      sections.push(`\n*（共 ${items.length} 条原始信息）*`);
+      parts.push(summary, `\n*（共 ${items.length} 条原始信息）*`);
     } catch (err) {
       console.error(`Failed to summarize ${domainName}:`, err);
-      appendFallbackItems(
-        sections,
-        items,
-        err instanceof Error ? err.message.slice(0, 180) : String(err).slice(0, 180),
-      );
+      const localParts: string[] = [];
+      appendFallbackItems(localParts, items, err instanceof Error ? err.message.slice(0, 180) : String(err).slice(0, 180));
+      parts.push(...localParts);
     }
+    domainSections[idx] = parts.join('\n');
   }
+
+  for (let i = 0; i < domainEntries.length; i += SUMMARY_CONCURRENCY) {
+    const batch = domainEntries.slice(i, i + SUMMARY_CONCURRENCY);
+    await Promise.all(batch.map(([domain, items], j) => summarizeDomain(i + j, domain, items)));
+  }
+  sections.push(...domainSections);
 
   // Source list
   sections.push('\n---\n## 信息来源\n');

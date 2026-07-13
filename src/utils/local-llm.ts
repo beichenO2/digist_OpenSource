@@ -11,11 +11,13 @@ const LLM_PROXY_V1 =
 const LLM_V1 = `${LLM_PROXY_V1}/v1`;
 
 function resolveModel(capability?: string): string {
-  const c = (capability ?? '0001').trim();
+  // Default capability → 0000 (GLM-5.2 via the working xfyun line). Callers can
+  // still pass an explicit code (e.g. 0011 fast, 0100 long-context) to override.
+  const c = (capability ?? '0000').trim();
   if (c.toUpperCase().startsWith('V') && c.length === 5) return c.toUpperCase();
   if (/^[01]{4}$/.test(c)) return c;
   if (c.includes('-') || c.length > 4) return c;
-  return '0001';
+  return '0000';
 }
 
 export interface LLMResponse {

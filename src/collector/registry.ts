@@ -1,12 +1,9 @@
 import { githubScraper } from '../scrapers/github.js';
 import { glassBridgeScraper } from '../scrapers/glass-bridge.js';
 import { redditScraper } from '../scrapers/reddit.js';
-import {
-  twitterScraper, xiaohongshuScraper,
-  zhihuScraper, bloombergScraper,
-} from '../scrapers/safari-scraper.js';
 import { bilibiliScraper } from '../scrapers/bilibili.js';
 import { v2exScraper } from '../scrapers/v2ex.js';
+import { bloombergScraper } from '../scrapers/rss-feed.js';
 import { wechatRssScraper as wechatScraper } from '../scrapers/wechat-rss.js';
 import { arxivScraper } from '../scrapers/arxiv.js';
 import { hackerNewsScraper as hackernewsScraper } from '../scrapers/hackernews.js';
@@ -37,6 +34,7 @@ function l3FallbackFor(platform: string): LayerHandler | undefined {
   return createL3Handler(reg.config, reg.seed);
 }
 
+/** L1 scraper primary with optional L3 fallback. */
 function strategy(platform: string, scraper: Scraper): PlatformStrategy {
   return {
     platform,
@@ -45,20 +43,31 @@ function strategy(platform: string, scraper: Scraper): PlatformStrategy {
   };
 }
 
+/**
+ * L3-as-primary strategy: the anti-detect browser + LLM self-heal IS the main
+ * path (no Safari dependency). Used for JS-heavy, login-free sites.
+ */
+function l3PrimaryStrategy(platform: string): PlatformStrategy {
+  const reg = L3_REGISTRATIONS[platform];
+  if (!reg) throw new Error(`No L3 registration for platform: ${platform}`);
+  return { platform, primary: createL3Handler(reg.config, reg.seed) };
+}
+
 export const l1Strategies: Record<string, PlatformStrategy> = {
-  twitter: strategy('twitter', twitterScraper),
   reddit: strategy('reddit', redditScraper),
   wechat: strategy('wechat', wechatScraper),
   github: strategy('github', githubScraper),
   glass: strategy('glass', glassBridgeScraper),
-  xiaohongshu: strategy('xiaohongshu', xiaohongshuScraper),
-  zhihu: strategy('zhihu', zhihuScraper),
   arxiv: strategy('arxiv', arxivScraper),
   bilibili: strategy('bilibili', bilibiliScraper),
   hackernews: strategy('hackernews', hackernewsScraper),
-  bloomberg: strategy('bloomberg', bloombergScraper),
   youtube: strategy('youtube', youtubeScraper),
   v2ex: strategy('v2ex', v2exScraper),
+  // bloomberg slot → CNBC 官方 RSS（L1 免登、零反爬；bloomberg.com 反爬弃用）。
+  bloomberg: strategy('bloomberg', bloombergScraper),
+  // ── L3-as-primary (anti-detect browser): JS-heavy, login-free sites ──
+  zhihu: l3PrimaryStrategy('zhihu'),
+  // twitter / xiaohongshu 已彻底移除采集（强风控高封号风险，用户指令停爬）。
 };
 
 export function getStrategy(platform: string): PlatformStrategy | undefined {
