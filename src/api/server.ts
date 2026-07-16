@@ -1,19 +1,18 @@
 /**
  * DiGist standalone orchestration HTTP API (not Next.js).
  *
- * command: npm run digist-api
- * env: DIGIST_DB (default ./data/digist.sqlite), PORT (default 3800)
+ * command: bash Start/api.sh (through PolarProcess)
+ * env: DIGIST_DB (default ./data/digist.sqlite), PORT (required)
  */
 import http from 'node:http';
 import { mkdirSync, existsSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { URL } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
-// digist-api can be launched with a minimal PATH (e.g. via nohup/launchd) that
+// digist-api can be launched with a minimal PATH that
 // lacks Homebrew / venv bin dirs, which breaks spawned tools such as yt-dlp,
 // ffmpeg and ffprobe ("spawn yt-dlp ENOENT"). Prepend the common tool locations
 // so child processes resolve them regardless of how the server was started.
@@ -37,8 +36,11 @@ import { emitBug, getStatus, runHealthCheck, runTargetTest, type StatusDeps } fr
 
 const execAsync = promisify(execFile);
 
-const PREFERRED_PORT = Number(process.env.PORT) || 3800;
-let PORT = PREFERRED_PORT;
+const PORT = Number(process.env.PORT);
+if (process.env.POLAR_RUNTIME_MANAGED !== '1' || !Number.isInteger(PORT) || PORT <= 0) {
+  console.error('[digist-api] Persistent execution must be started by PolarProcess via Start/api.sh.');
+  process.exit(1);
+}
 let cachedRecommender: any = null;
 let cachedRecommenderAt = 0;
 const DB_PATH = process.env.DIGIST_DB || './data/digist.sqlite';
@@ -861,58 +863,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-const _requireCjs = createRequire(import.meta.url);
-try {
-  const sdkPath = resolve(dirname(new URL(import.meta.url).pathname), '..', '..', '..', 'PolarPort', 'src', 'sdk', 'index.cjs');
-  const { claimPort, registerCapabilities } = _requireCjs(sdkPath);
-  PORT = await claimPort({ service: 'digist-api', project: 'digist', preferred: PREFERRED_PORT });
-
-  const capPath = resolve(dirname(new URL(import.meta.url).pathname), '..', '..', '..', 'digist', 'capabilities.json');
-  registerCapabilities(capPath).catch((e: unknown) => console.warn('[digist] capability registration failed (non-fatal):', e));
-} catch (e) {
-  console.error('[digist] port-sdk claimPort failed — aborting:', e);
-  process.exit(1);
-}
-
 import { SmartScheduler } from '../scheduler/smart-scheduler.js';
-import net from 'node:net';
-
-async function isPortFree(port: number): Promise<boolean> {
-  const hosts = ['127.0.0.1', '::'];
-  for (const host of hosts) {
-    const busy = await new Promise<boolean>((res) => {
-      const tester = net.createServer();
-      tester.once('error', () => res(true));
-      tester.listen(port, host, () => { tester.close(() => res(false)); });
-    });
-    if (busy) return false;
-  }
-  return true;
-}
-
-async function killPortOccupant(port: number, maxRetries = 3): Promise<boolean> {
-  for (let i = 0; i < maxRetries; i++) {
-    if (await isPortFree(port)) return true;
-
-    console.warn(`[digist-api] Port ${port} occupied (attempt ${i + 1}/${maxRetries}), killing occupant...`);
-    try {
-      const { stdout } = await execAsync('lsof', ['-ti', `:${port}`]);
-      const pids = stdout.trim().split('\n').filter(Boolean);
-      for (const pid of pids) {
-        if (pid === String(process.pid)) continue;
-        try { process.kill(Number(pid), 'SIGTERM'); } catch {}
-      }
-      await new Promise((r) => setTimeout(r, 2000));
-    } catch {}
-  }
-  return await isPortFree(port);
-}
-
-const portReady = await killPortOccupant(PORT);
-if (!portReady) {
-  console.error(`[digist-api] FATAL: port ${PORT} still occupied after retries — aborting`);
-  process.exit(1);
-}
 
 let smartScheduler: SmartScheduler | null = null;
 

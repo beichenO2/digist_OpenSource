@@ -401,6 +401,45 @@
         }
       ],
       "blockers": []
+    },
+    {
+      "id": "R6",
+      "need": "运行时端口与进程统一治理",
+      "approach": "将 HTTP API 统一为 digist-api canonical 身份并通过 PolarPort 申请 3800；将无端口常驻 worker 统一为 digist-engine-worker 并仅由 PolarProcess 管理，旧 digist-engine 因历史端口字段不可清空而保留为 stopped tombstone。所有入口前台 exec，退役应用内 PID 锁、端口抢占与直接信号。",
+      "features": [
+        {
+          "name": "runtime_governance",
+          "status": "done",
+          "tech": [
+            "PolarPort",
+            "PolarProcess",
+            "Bash",
+            "Node.js 22",
+            "TypeScript"
+          ],
+          "behavior": [
+            "digist-api 仅由 PolarProcess 管理并通过 PolarPort 申请 preferred port 3800",
+            "digist-engine-worker 是无端口前台 worker，由 PolarProcess 管理且不维护 PID 文件；旧 digist-engine 精确停止并退役",
+            "API 不再探测或杀死端口 occupant，端口冲突直接失败并交回 PolarProcess",
+            "旧 PolarProcess 服务 ID digist 精确停止并退役为 auto_start=false，不与 digist-api 并存",
+            "digist-daily-digest、digist-auto-evolve、digist-to-knowlever-sync 与 digist-summarize 任务不执行、不改为 listener"
+          ],
+          "test_status": "passed",
+          "evidence": [
+            "2026-07-16: baseline audit drift=1 (Start scripts contain direct background/kill control); PolarPort and PolarProcess healthy",
+            "2026-07-16: baseline API digist running with verified PID 2565 on 3800 while PolarPort canonical owner is digist-api; Engine PID 47379 is a no-listener worker but is incorrectly registered with port 8015",
+            "2026-07-16: Node 22 baseline main suites passed 45 edge + 45 all + 18 scraper checks and performance benchmark; TypeScript build, 45 contract assertions and Next.js Web build passed",
+            "2026-07-16: test-all baseline used an online SQLite backup inside the isolated worktree; live service data was not modified",
+            "2026-07-16: canonical API cutover replaced legacy PID 2565 with PolarProcess-verified PID 97931 on 3800; the first legacy stop did not hit the old process because its historical Start script had already become a canonical client, so registration was split into prepare/finalize and the mismatch was resolved without direct signals",
+            "2026-07-16: legacy engine PID 47379 was stopped only through PolarProcess; because the existing digist-engine port 8015 cannot be cleared through the current register API, that identity is a stopped tombstone and canonical digist-engine-worker runs verified as PID 13598 with port=null",
+            "2026-07-16: digist-daily-digest cron independently started PID 7594 at 23:00 during registration and was not stopped, restarted or modified; auto-evolve, to-knowlever-sync and summarize remained stopped",
+            "2026-07-16: isolated online SQLite backup verification passed 45 edge + 45 all + 18 scraper checks, performance benchmark, TypeScript build, runtime contract and shell syntax; Web production build passed from the identical main commit with the existing PolarClaw dynamic dependency warning",
+            "2026-07-16: PolarPort has the single active owner digist-api/digist:3800; API health returned ok, 8015 and 8045 had no listeners, project audit was compliant and ecosystem drift decreased from 24 to 20",
+            "2026-07-16: completion gate reran after tested state: PolarPort and PolarProcess healthy, project audit compliant, digist-api PID 97931 and digist-engine-worker PID 13598 both running/verified, both legacy identities stopped, and 3800 had exactly one listener"
+          ]
+        }
+      ],
+      "blockers": []
     }
   ],
   "lobster": {
@@ -436,11 +475,33 @@
   ],
   "service_management": {
     "health_endpoint": "http://127.0.0.1:3800/api/health",
-    "start_script_dir": "Start",
-    "restart_command": "bash ~/Polarisor/digist/Start/restart.sh",
-    "port": 3800,
+    "start_command": "bash Start/api.sh",
+    "restart_command": "bash Start/api.sh",
+    "preferred_port": 3800,
+    "service_id": "digist-api",
     "auto_start": true,
-    "notes": "QA: `npm test` (edge+all+scrapers+perf). Auto-Evolve: PolarProcess cron `digist-auto-evolve` every 3d 05:00 — QA-gated minor/patch upgrades via Agent_core/scripts/auto-evolve.mjs; auto-restart + health rollback."
+    "process_mode": "foreground_command",
+    "services": [
+      {
+        "service_id": "digist-api",
+        "name": "DiGist API",
+        "start_command": "bash Start/api.sh",
+        "health_endpoint": "http://127.0.0.1:3800/api/health",
+        "preferred_port": 3800,
+        "auto_start": true,
+        "process_mode": "foreground_command"
+      },
+      {
+        "service_id": "digist-engine-worker",
+        "name": "DiGist Engine Worker",
+        "start_command": "bash Start/engine.sh",
+        "health_endpoint": null,
+        "preferred_port": null,
+        "auto_start": true,
+        "process_mode": "foreground_worker"
+      }
+    ],
+    "notes": "QA: npm test on an isolated SQLite backup. Existing digest/evolve/sync task records remain under PolarProcess and are outside the listener migration."
   },
   "contacts": {
     "last_updated": "2026-05-01T22:08+08:00",

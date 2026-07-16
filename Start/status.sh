@@ -1,3 +1,7 @@
 #!/usr/bin/env bash
-# Thin wrapper — delegates to start.sh status (PolarProcess looks up status.sh).
-exec "$(cd "$(dirname "$0")" && pwd)/start.sh" status
+set -euo pipefail
+
+POLARPROCESS_URL=${POLARPROCESS_URL:-http://127.0.0.1:11055}
+SERVICE_ID=digist-api
+curl -fsS --max-time 3 "$POLARPROCESS_URL/api/health" >/dev/null
+exec curl -fsS "$POLARPROCESS_URL/api/services/$SERVICE_ID"

@@ -1,151 +1,20 @@
 #!/usr/bin/env bash
-# digist-api lifecycle script — PolarProcess + PolarPort convention.
-#
-# Managed by PolarProcess (registered in shared_services with start_script_dir).
-# Replaces the old launchd plist + standalone nohup launch.
-#
-# Daemonization uses POSIX setsid (new session, detached from controlling
-# terminal) — NOT nohup. macOS ships no `setsid` binary, so we invoke the
-# identical syscall via python3 `os.setsid()`.
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-PID_FILE="$SCRIPT_DIR/.pid"
-SERVICE_NAME="digist-api"
-PROJECT="digist"
-PREFERRED_PORT=3800
+POLARPROCESS_URL=${POLARPROCESS_URL:-http://127.0.0.1:11055}
+SERVICE_ID=digist-api
+ACTION=${1:-start}
 
-cd "$PROJECT_DIR"
-
-# ── Dynamic port allocation via PolarPort ────────────────
-source "$PROJECT_DIR/../Agent_core/scripts/port-claim.sh"
-PORT=$(claim_port "$SERVICE_NAME" "$PROJECT" "$PREFERRED_PORT")
-HEALTH_URL="http://127.0.0.1:${PORT}/api/health"
-
-# ── Node version alignment (engines.node >= 22) ──────────
-source "$PROJECT_DIR/scripts/ensure-node.sh" "$PROJECT_DIR"
-NODE_BIN="$(command -v node)"
-NPM_BIN="$(dirname "$NODE_BIN")/npm"
-
-# ── External tools (yt-dlp / ffmpeg / ffprobe) on PATH ───
-# Append only — do not prepend homebrew before nvm node/npm.
-export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:$HOME/.agent-reach-venv/bin"
-
-LOG_FILE="$PROJECT_DIR/data/logs/api-stdout.log"
-mkdir -p "$PROJECT_DIR/data/logs"
-
-# setsid replacement: new session + exec, no controlling terminal, no nohup.
-# Invoked inline (not via a function) so $! is the execed node PID, not a
-# bash subshell wrapper — keeps the PID file pointing at the real server.
-SETSID_EXEC='import os,sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])'
-
-do_start() {
-    OCCUPANT_PID=$(lsof -iTCP:"$PORT" -sTCP:LISTEN -P -n -t 2>/dev/null | head -1 || true)
-    if [ -n "$OCCUPANT_PID" ]; then
-        echo "Already running pid=$OCCUPANT_PID port=$PORT"
-        exit 0
-    fi
-
-    if [ -f "$PID_FILE" ]; then
-        OLD_PID=$(cat "$PID_FILE" 2>/dev/null || true)
-        if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
-            echo "Already running pid=$OLD_PID port=$PORT"
-            exit 0
-        fi
-        rm -f "$PID_FILE"
-    fi
-
-    if [ ! -d "node_modules" ] || [ "package.json" -nt "node_modules/.package-lock.json" ]; then
-        echo "Installing dependencies with $("$NODE_BIN" -v)..."
-        "$NPM_BIN" ci --include=dev 2>&1 || "$NPM_BIN" install 2>&1
-    fi
-
-    local tsx_bin
-    tsx_bin="$PROJECT_DIR/node_modules/.bin/tsx"
-
-    export PORT
-    export POLARPRIVATE_URL="${POLARPRIVATE_URL:-http://127.0.0.1:12790}"
-    python3 -c "$SETSID_EXEC" "$NODE_BIN" "$tsx_bin" src/api/server.ts >> "$LOG_FILE" 2>&1 < /dev/null &
-    DAEMON_PID=$!
-    echo "$DAEMON_PID" > "$PID_FILE"
-
-    for i in $(seq 1 30); do
-        if curl -sf "$HEALTH_URL" >/dev/null 2>&1; then
-            echo "Started pid=$DAEMON_PID port=$PORT"
-            exit 0
-        fi
-        if ! kill -0 "$DAEMON_PID" 2>/dev/null; then
-            echo "Process exited immediately" >&2
-            rm -f "$PID_FILE"
-            exit 1
-        fi
-        sleep 1
-    done
-
-    echo "Timed out waiting for health endpoint on port $PORT" >&2
-    rm -f "$PID_FILE"
-    exit 1
-}
-
-do_stop() {
-    # Collect every PID involved: the recorded launcher PID plus whatever is
-    # actually listening on the port (tsx may exec a child that binds it).
-    local pids=""
-    if [ -f "$PID_FILE" ]; then
-        pids="$(cat "$PID_FILE" 2>/dev/null || true)"
-    fi
-    pids="$pids $(lsof -iTCP:"$PORT" -sTCP:LISTEN -P -n -t 2>/dev/null || true)"
-    pids=$(printf '%s\n' $pids | grep -E '^[0-9]+$' | sort -u || true)
-
-    if [ -z "$pids" ]; then
-        echo "Not running"
-        rm -f "$PID_FILE"
-        exit 0
-    fi
-
-    echo "Stopping pids: $(printf '%s ' $pids)"
-    for p in $pids; do kill "$p" 2>/dev/null || true; done
-    for i in $(seq 1 10); do
-        local alive=""
-        for p in $pids; do kill -0 "$p" 2>/dev/null && alive="$alive $p"; done
-        [ -z "$alive" ] && break
-        sleep 1
-    done
-    for p in $pids; do kill -0 "$p" 2>/dev/null && kill -9 "$p" 2>/dev/null || true; done
-    rm -f "$PID_FILE"
-    echo "Stopped"
-}
-
-do_restart() { do_stop; do_start; }
-
-do_status() {
-    local pid=""
-    if [ -f "$PID_FILE" ]; then
-        pid=$(cat "$PID_FILE" 2>/dev/null || true)
-    fi
-    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-        echo "Running pid=$pid port=$PORT"
-        exit 0
-    fi
-    local occ
-    occ=$(lsof -iTCP:"$PORT" -sTCP:LISTEN -P -n -t 2>/dev/null | head -1 || true)
-    if [ -n "$occ" ]; then
-        echo "Running pid=$occ port=$PORT (PID file stale)"
-        echo "$occ" > "$PID_FILE"
-        exit 0
-    fi
-    echo "Not running"
-    exit 1
-}
-
-case "${1:-start}" in
-    start)   do_start   ;;
-    stop)    do_stop    ;;
-    restart) do_restart ;;
-    status)  do_status  ;;
-    *)
-        echo "Usage: bash Start/start.sh [start|stop|restart|status]" >&2
-        exit 1
-        ;;
+curl -fsS --max-time 3 "$POLARPROCESS_URL/api/health" >/dev/null
+case "$ACTION" in
+  start|stop|restart)
+    exec curl -fsS -X POST "$POLARPROCESS_URL/api/services/$SERVICE_ID/$ACTION"
+    ;;
+  status)
+    exec curl -fsS "$POLARPROCESS_URL/api/services/$SERVICE_ID"
+    ;;
+  *)
+    echo "Usage: bash Start/start.sh [start|stop|restart|status]" >&2
+    exit 2
+    ;;
 esac

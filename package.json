@@ -30,13 +30,13 @@
     "test:l3": "tsx tests/l3-selfheal.qa.ts"
   },
   "dependencies": {
-    "@mendable/firecrawl-js": "^1.21.1",
-    "axios": "^1.7.0",
+    "@mendable/firecrawl-js": "^1.29.3",
+    "axios": "^1.18.1",
     "better-sqlite3": "^11.0.0",
     "cheerio": "^1.0.0",
     "graphology": "^0.26.0",
     "graphology-communities-louvain": "^2.0.2",
-    "nanoid": "^5.0.0",
+    "nanoid": "^5.1.16",
     "node-cron": "^3.0.3",
     "turndown": "^7.2.0"
   },
@@ -45,10 +45,10 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.0",
-    "@types/node": "^22.0.0",
+    "@types/node": "^22.20.1",
     "@types/node-cron": "^3.0.0",
     "@types/turndown": "^5.0.0",
-    "tsx": "^4.19.0",
+    "tsx": "^4.23.1",
     "typescript": "^5.6.0"
   },
   "optionalDependencies": {
