@@ -2,6 +2,9 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "PATH=$HOME/.nvm/versions/node/v22.22.2/bin:$PATH node scripts/start-with-sot-port.mjs dev",
     "build": "next build --webpack",
